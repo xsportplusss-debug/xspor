@@ -9,8 +9,26 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SatisFaturalariRouteImport } from './routes/satis-faturalari'
+import { Route as EArsivRouteImport } from './routes/e-arsiv'
+import { Route as AlisFaturalariRouteImport } from './routes/alis-faturalari'
 import { Route as IndexRouteImport } from './routes/index'
 
+const SatisFaturalariRoute = SatisFaturalariRouteImport.update({
+  id: '/satis-faturalari',
+  path: '/satis-faturalari',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EArsivRoute = EArsivRouteImport.update({
+  id: '/e-arsiv',
+  path: '/e-arsiv',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AlisFaturalariRoute = AlisFaturalariRouteImport.update({
+  id: '/alis-faturalari',
+  path: '/alis-faturalari',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -19,28 +37,61 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/alis-faturalari': typeof AlisFaturalariRoute
+  '/e-arsiv': typeof EArsivRoute
+  '/satis-faturalari': typeof SatisFaturalariRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/alis-faturalari': typeof AlisFaturalariRoute
+  '/e-arsiv': typeof EArsivRoute
+  '/satis-faturalari': typeof SatisFaturalariRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/alis-faturalari': typeof AlisFaturalariRoute
+  '/e-arsiv': typeof EArsivRoute
+  '/satis-faturalari': typeof SatisFaturalariRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/alis-faturalari' | '/e-arsiv' | '/satis-faturalari'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/alis-faturalari' | '/e-arsiv' | '/satis-faturalari'
+  id: '__root__' | '/' | '/alis-faturalari' | '/e-arsiv' | '/satis-faturalari'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AlisFaturalariRoute: typeof AlisFaturalariRoute
+  EArsivRoute: typeof EArsivRoute
+  SatisFaturalariRoute: typeof SatisFaturalariRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/satis-faturalari': {
+      id: '/satis-faturalari'
+      path: '/satis-faturalari'
+      fullPath: '/satis-faturalari'
+      preLoaderRoute: typeof SatisFaturalariRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/e-arsiv': {
+      id: '/e-arsiv'
+      path: '/e-arsiv'
+      fullPath: '/e-arsiv'
+      preLoaderRoute: typeof EArsivRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/alis-faturalari': {
+      id: '/alis-faturalari'
+      path: '/alis-faturalari'
+      fullPath: '/alis-faturalari'
+      preLoaderRoute: typeof AlisFaturalariRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -53,6 +104,9 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AlisFaturalariRoute: AlisFaturalariRoute,
+  EArsivRoute: EArsivRoute,
+  SatisFaturalariRoute: SatisFaturalariRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
