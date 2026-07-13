@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import { incomes, expenses, fmtTL } from "@/lib/mock-data";
+import { incomes, fmtTL } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/gelirler")({
   head: () => ({
