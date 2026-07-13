@@ -9,38 +9,467 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UrunlerRouteImport } from './routes/urunler'
+import { Route as TedarikcilerRouteImport } from './routes/tedarikciler'
+import { Route as TakvimRouteImport } from './routes/takvim'
+import { Route as StokHareketleriRouteImport } from './routes/stok-hareketleri'
+import { Route as SatisFaturalariRouteImport } from './routes/satis-faturalari'
+import { Route as RaporlarRouteImport } from './routes/raporlar'
+import { Route as MusterilerRouteImport } from './routes/musteriler'
+import { Route as KullanicilarRouteImport } from './routes/kullanicilar'
+import { Route as KategorilerRouteImport } from './routes/kategoriler'
+import { Route as KasaRouteImport } from './routes/kasa'
+import { Route as GiderlerRouteImport } from './routes/giderler'
+import { Route as GelirlerRouteImport } from './routes/gelirler'
+import { Route as FirmaAyarlariRouteImport } from './routes/firma-ayarlari'
+import { Route as EArsivRouteImport } from './routes/e-arsiv'
+import { Route as CariHesaplarRouteImport } from './routes/cari-hesaplar'
+import { Route as BildirimlerRouteImport } from './routes/bildirimler'
+import { Route as BankalarRouteImport } from './routes/bankalar'
+import { Route as AlisFaturalariRouteImport } from './routes/alis-faturalari'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PazaryerleriTrendyolRouteImport } from './routes/pazaryerleri.trendyol'
+import { Route as PazaryerleriPazaramaRouteImport } from './routes/pazaryerleri.pazarama'
+import { Route as PazaryerleriN11RouteImport } from './routes/pazaryerleri.n11'
+import { Route as PazaryerleriHepsiburadaRouteImport } from './routes/pazaryerleri.hepsiburada'
+import { Route as PazaryerleriAmazonRouteImport } from './routes/pazaryerleri.amazon'
 
+const UrunlerRoute = UrunlerRouteImport.update({
+  id: '/urunler',
+  path: '/urunler',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TedarikcilerRoute = TedarikcilerRouteImport.update({
+  id: '/tedarikciler',
+  path: '/tedarikciler',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TakvimRoute = TakvimRouteImport.update({
+  id: '/takvim',
+  path: '/takvim',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StokHareketleriRoute = StokHareketleriRouteImport.update({
+  id: '/stok-hareketleri',
+  path: '/stok-hareketleri',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SatisFaturalariRoute = SatisFaturalariRouteImport.update({
+  id: '/satis-faturalari',
+  path: '/satis-faturalari',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RaporlarRoute = RaporlarRouteImport.update({
+  id: '/raporlar',
+  path: '/raporlar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MusterilerRoute = MusterilerRouteImport.update({
+  id: '/musteriler',
+  path: '/musteriler',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KullanicilarRoute = KullanicilarRouteImport.update({
+  id: '/kullanicilar',
+  path: '/kullanicilar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KategorilerRoute = KategorilerRouteImport.update({
+  id: '/kategoriler',
+  path: '/kategoriler',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KasaRoute = KasaRouteImport.update({
+  id: '/kasa',
+  path: '/kasa',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GiderlerRoute = GiderlerRouteImport.update({
+  id: '/giderler',
+  path: '/giderler',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GelirlerRoute = GelirlerRouteImport.update({
+  id: '/gelirler',
+  path: '/gelirler',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FirmaAyarlariRoute = FirmaAyarlariRouteImport.update({
+  id: '/firma-ayarlari',
+  path: '/firma-ayarlari',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EArsivRoute = EArsivRouteImport.update({
+  id: '/e-arsiv',
+  path: '/e-arsiv',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CariHesaplarRoute = CariHesaplarRouteImport.update({
+  id: '/cari-hesaplar',
+  path: '/cari-hesaplar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BildirimlerRoute = BildirimlerRouteImport.update({
+  id: '/bildirimler',
+  path: '/bildirimler',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BankalarRoute = BankalarRouteImport.update({
+  id: '/bankalar',
+  path: '/bankalar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AlisFaturalariRoute = AlisFaturalariRouteImport.update({
+  id: '/alis-faturalari',
+  path: '/alis-faturalari',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PazaryerleriTrendyolRoute = PazaryerleriTrendyolRouteImport.update({
+  id: '/pazaryerleri/trendyol',
+  path: '/pazaryerleri/trendyol',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PazaryerleriPazaramaRoute = PazaryerleriPazaramaRouteImport.update({
+  id: '/pazaryerleri/pazarama',
+  path: '/pazaryerleri/pazarama',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PazaryerleriN11Route = PazaryerleriN11RouteImport.update({
+  id: '/pazaryerleri/n11',
+  path: '/pazaryerleri/n11',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PazaryerleriHepsiburadaRoute = PazaryerleriHepsiburadaRouteImport.update({
+  id: '/pazaryerleri/hepsiburada',
+  path: '/pazaryerleri/hepsiburada',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PazaryerleriAmazonRoute = PazaryerleriAmazonRouteImport.update({
+  id: '/pazaryerleri/amazon',
+  path: '/pazaryerleri/amazon',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/alis-faturalari': typeof AlisFaturalariRoute
+  '/bankalar': typeof BankalarRoute
+  '/bildirimler': typeof BildirimlerRoute
+  '/cari-hesaplar': typeof CariHesaplarRoute
+  '/e-arsiv': typeof EArsivRoute
+  '/firma-ayarlari': typeof FirmaAyarlariRoute
+  '/gelirler': typeof GelirlerRoute
+  '/giderler': typeof GiderlerRoute
+  '/kasa': typeof KasaRoute
+  '/kategoriler': typeof KategorilerRoute
+  '/kullanicilar': typeof KullanicilarRoute
+  '/musteriler': typeof MusterilerRoute
+  '/raporlar': typeof RaporlarRoute
+  '/satis-faturalari': typeof SatisFaturalariRoute
+  '/stok-hareketleri': typeof StokHareketleriRoute
+  '/takvim': typeof TakvimRoute
+  '/tedarikciler': typeof TedarikcilerRoute
+  '/urunler': typeof UrunlerRoute
+  '/pazaryerleri/amazon': typeof PazaryerleriAmazonRoute
+  '/pazaryerleri/hepsiburada': typeof PazaryerleriHepsiburadaRoute
+  '/pazaryerleri/n11': typeof PazaryerleriN11Route
+  '/pazaryerleri/pazarama': typeof PazaryerleriPazaramaRoute
+  '/pazaryerleri/trendyol': typeof PazaryerleriTrendyolRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/alis-faturalari': typeof AlisFaturalariRoute
+  '/bankalar': typeof BankalarRoute
+  '/bildirimler': typeof BildirimlerRoute
+  '/cari-hesaplar': typeof CariHesaplarRoute
+  '/e-arsiv': typeof EArsivRoute
+  '/firma-ayarlari': typeof FirmaAyarlariRoute
+  '/gelirler': typeof GelirlerRoute
+  '/giderler': typeof GiderlerRoute
+  '/kasa': typeof KasaRoute
+  '/kategoriler': typeof KategorilerRoute
+  '/kullanicilar': typeof KullanicilarRoute
+  '/musteriler': typeof MusterilerRoute
+  '/raporlar': typeof RaporlarRoute
+  '/satis-faturalari': typeof SatisFaturalariRoute
+  '/stok-hareketleri': typeof StokHareketleriRoute
+  '/takvim': typeof TakvimRoute
+  '/tedarikciler': typeof TedarikcilerRoute
+  '/urunler': typeof UrunlerRoute
+  '/pazaryerleri/amazon': typeof PazaryerleriAmazonRoute
+  '/pazaryerleri/hepsiburada': typeof PazaryerleriHepsiburadaRoute
+  '/pazaryerleri/n11': typeof PazaryerleriN11Route
+  '/pazaryerleri/pazarama': typeof PazaryerleriPazaramaRoute
+  '/pazaryerleri/trendyol': typeof PazaryerleriTrendyolRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/alis-faturalari': typeof AlisFaturalariRoute
+  '/bankalar': typeof BankalarRoute
+  '/bildirimler': typeof BildirimlerRoute
+  '/cari-hesaplar': typeof CariHesaplarRoute
+  '/e-arsiv': typeof EArsivRoute
+  '/firma-ayarlari': typeof FirmaAyarlariRoute
+  '/gelirler': typeof GelirlerRoute
+  '/giderler': typeof GiderlerRoute
+  '/kasa': typeof KasaRoute
+  '/kategoriler': typeof KategorilerRoute
+  '/kullanicilar': typeof KullanicilarRoute
+  '/musteriler': typeof MusterilerRoute
+  '/raporlar': typeof RaporlarRoute
+  '/satis-faturalari': typeof SatisFaturalariRoute
+  '/stok-hareketleri': typeof StokHareketleriRoute
+  '/takvim': typeof TakvimRoute
+  '/tedarikciler': typeof TedarikcilerRoute
+  '/urunler': typeof UrunlerRoute
+  '/pazaryerleri/amazon': typeof PazaryerleriAmazonRoute
+  '/pazaryerleri/hepsiburada': typeof PazaryerleriHepsiburadaRoute
+  '/pazaryerleri/n11': typeof PazaryerleriN11Route
+  '/pazaryerleri/pazarama': typeof PazaryerleriPazaramaRoute
+  '/pazaryerleri/trendyol': typeof PazaryerleriTrendyolRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/alis-faturalari'
+    | '/bankalar'
+    | '/bildirimler'
+    | '/cari-hesaplar'
+    | '/e-arsiv'
+    | '/firma-ayarlari'
+    | '/gelirler'
+    | '/giderler'
+    | '/kasa'
+    | '/kategoriler'
+    | '/kullanicilar'
+    | '/musteriler'
+    | '/raporlar'
+    | '/satis-faturalari'
+    | '/stok-hareketleri'
+    | '/takvim'
+    | '/tedarikciler'
+    | '/urunler'
+    | '/pazaryerleri/amazon'
+    | '/pazaryerleri/hepsiburada'
+    | '/pazaryerleri/n11'
+    | '/pazaryerleri/pazarama'
+    | '/pazaryerleri/trendyol'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/alis-faturalari'
+    | '/bankalar'
+    | '/bildirimler'
+    | '/cari-hesaplar'
+    | '/e-arsiv'
+    | '/firma-ayarlari'
+    | '/gelirler'
+    | '/giderler'
+    | '/kasa'
+    | '/kategoriler'
+    | '/kullanicilar'
+    | '/musteriler'
+    | '/raporlar'
+    | '/satis-faturalari'
+    | '/stok-hareketleri'
+    | '/takvim'
+    | '/tedarikciler'
+    | '/urunler'
+    | '/pazaryerleri/amazon'
+    | '/pazaryerleri/hepsiburada'
+    | '/pazaryerleri/n11'
+    | '/pazaryerleri/pazarama'
+    | '/pazaryerleri/trendyol'
+  id:
+    | '__root__'
+    | '/'
+    | '/alis-faturalari'
+    | '/bankalar'
+    | '/bildirimler'
+    | '/cari-hesaplar'
+    | '/e-arsiv'
+    | '/firma-ayarlari'
+    | '/gelirler'
+    | '/giderler'
+    | '/kasa'
+    | '/kategoriler'
+    | '/kullanicilar'
+    | '/musteriler'
+    | '/raporlar'
+    | '/satis-faturalari'
+    | '/stok-hareketleri'
+    | '/takvim'
+    | '/tedarikciler'
+    | '/urunler'
+    | '/pazaryerleri/amazon'
+    | '/pazaryerleri/hepsiburada'
+    | '/pazaryerleri/n11'
+    | '/pazaryerleri/pazarama'
+    | '/pazaryerleri/trendyol'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AlisFaturalariRoute: typeof AlisFaturalariRoute
+  BankalarRoute: typeof BankalarRoute
+  BildirimlerRoute: typeof BildirimlerRoute
+  CariHesaplarRoute: typeof CariHesaplarRoute
+  EArsivRoute: typeof EArsivRoute
+  FirmaAyarlariRoute: typeof FirmaAyarlariRoute
+  GelirlerRoute: typeof GelirlerRoute
+  GiderlerRoute: typeof GiderlerRoute
+  KasaRoute: typeof KasaRoute
+  KategorilerRoute: typeof KategorilerRoute
+  KullanicilarRoute: typeof KullanicilarRoute
+  MusterilerRoute: typeof MusterilerRoute
+  RaporlarRoute: typeof RaporlarRoute
+  SatisFaturalariRoute: typeof SatisFaturalariRoute
+  StokHareketleriRoute: typeof StokHareketleriRoute
+  TakvimRoute: typeof TakvimRoute
+  TedarikcilerRoute: typeof TedarikcilerRoute
+  UrunlerRoute: typeof UrunlerRoute
+  PazaryerleriAmazonRoute: typeof PazaryerleriAmazonRoute
+  PazaryerleriHepsiburadaRoute: typeof PazaryerleriHepsiburadaRoute
+  PazaryerleriN11Route: typeof PazaryerleriN11Route
+  PazaryerleriPazaramaRoute: typeof PazaryerleriPazaramaRoute
+  PazaryerleriTrendyolRoute: typeof PazaryerleriTrendyolRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/urunler': {
+      id: '/urunler'
+      path: '/urunler'
+      fullPath: '/urunler'
+      preLoaderRoute: typeof UrunlerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tedarikciler': {
+      id: '/tedarikciler'
+      path: '/tedarikciler'
+      fullPath: '/tedarikciler'
+      preLoaderRoute: typeof TedarikcilerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/takvim': {
+      id: '/takvim'
+      path: '/takvim'
+      fullPath: '/takvim'
+      preLoaderRoute: typeof TakvimRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stok-hareketleri': {
+      id: '/stok-hareketleri'
+      path: '/stok-hareketleri'
+      fullPath: '/stok-hareketleri'
+      preLoaderRoute: typeof StokHareketleriRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/satis-faturalari': {
+      id: '/satis-faturalari'
+      path: '/satis-faturalari'
+      fullPath: '/satis-faturalari'
+      preLoaderRoute: typeof SatisFaturalariRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/raporlar': {
+      id: '/raporlar'
+      path: '/raporlar'
+      fullPath: '/raporlar'
+      preLoaderRoute: typeof RaporlarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/musteriler': {
+      id: '/musteriler'
+      path: '/musteriler'
+      fullPath: '/musteriler'
+      preLoaderRoute: typeof MusterilerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kullanicilar': {
+      id: '/kullanicilar'
+      path: '/kullanicilar'
+      fullPath: '/kullanicilar'
+      preLoaderRoute: typeof KullanicilarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kategoriler': {
+      id: '/kategoriler'
+      path: '/kategoriler'
+      fullPath: '/kategoriler'
+      preLoaderRoute: typeof KategorilerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kasa': {
+      id: '/kasa'
+      path: '/kasa'
+      fullPath: '/kasa'
+      preLoaderRoute: typeof KasaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/giderler': {
+      id: '/giderler'
+      path: '/giderler'
+      fullPath: '/giderler'
+      preLoaderRoute: typeof GiderlerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gelirler': {
+      id: '/gelirler'
+      path: '/gelirler'
+      fullPath: '/gelirler'
+      preLoaderRoute: typeof GelirlerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/firma-ayarlari': {
+      id: '/firma-ayarlari'
+      path: '/firma-ayarlari'
+      fullPath: '/firma-ayarlari'
+      preLoaderRoute: typeof FirmaAyarlariRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/e-arsiv': {
+      id: '/e-arsiv'
+      path: '/e-arsiv'
+      fullPath: '/e-arsiv'
+      preLoaderRoute: typeof EArsivRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cari-hesaplar': {
+      id: '/cari-hesaplar'
+      path: '/cari-hesaplar'
+      fullPath: '/cari-hesaplar'
+      preLoaderRoute: typeof CariHesaplarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bildirimler': {
+      id: '/bildirimler'
+      path: '/bildirimler'
+      fullPath: '/bildirimler'
+      preLoaderRoute: typeof BildirimlerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bankalar': {
+      id: '/bankalar'
+      path: '/bankalar'
+      fullPath: '/bankalar'
+      preLoaderRoute: typeof BankalarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/alis-faturalari': {
+      id: '/alis-faturalari'
+      path: '/alis-faturalari'
+      fullPath: '/alis-faturalari'
+      preLoaderRoute: typeof AlisFaturalariRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +477,70 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pazaryerleri/trendyol': {
+      id: '/pazaryerleri/trendyol'
+      path: '/pazaryerleri/trendyol'
+      fullPath: '/pazaryerleri/trendyol'
+      preLoaderRoute: typeof PazaryerleriTrendyolRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pazaryerleri/pazarama': {
+      id: '/pazaryerleri/pazarama'
+      path: '/pazaryerleri/pazarama'
+      fullPath: '/pazaryerleri/pazarama'
+      preLoaderRoute: typeof PazaryerleriPazaramaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pazaryerleri/n11': {
+      id: '/pazaryerleri/n11'
+      path: '/pazaryerleri/n11'
+      fullPath: '/pazaryerleri/n11'
+      preLoaderRoute: typeof PazaryerleriN11RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pazaryerleri/hepsiburada': {
+      id: '/pazaryerleri/hepsiburada'
+      path: '/pazaryerleri/hepsiburada'
+      fullPath: '/pazaryerleri/hepsiburada'
+      preLoaderRoute: typeof PazaryerleriHepsiburadaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pazaryerleri/amazon': {
+      id: '/pazaryerleri/amazon'
+      path: '/pazaryerleri/amazon'
+      fullPath: '/pazaryerleri/amazon'
+      preLoaderRoute: typeof PazaryerleriAmazonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AlisFaturalariRoute: AlisFaturalariRoute,
+  BankalarRoute: BankalarRoute,
+  BildirimlerRoute: BildirimlerRoute,
+  CariHesaplarRoute: CariHesaplarRoute,
+  EArsivRoute: EArsivRoute,
+  FirmaAyarlariRoute: FirmaAyarlariRoute,
+  GelirlerRoute: GelirlerRoute,
+  GiderlerRoute: GiderlerRoute,
+  KasaRoute: KasaRoute,
+  KategorilerRoute: KategorilerRoute,
+  KullanicilarRoute: KullanicilarRoute,
+  MusterilerRoute: MusterilerRoute,
+  RaporlarRoute: RaporlarRoute,
+  SatisFaturalariRoute: SatisFaturalariRoute,
+  StokHareketleriRoute: StokHareketleriRoute,
+  TakvimRoute: TakvimRoute,
+  TedarikcilerRoute: TedarikcilerRoute,
+  UrunlerRoute: UrunlerRoute,
+  PazaryerleriAmazonRoute: PazaryerleriAmazonRoute,
+  PazaryerleriHepsiburadaRoute: PazaryerleriHepsiburadaRoute,
+  PazaryerleriN11Route: PazaryerleriN11Route,
+  PazaryerleriPazaramaRoute: PazaryerleriPazaramaRoute,
+  PazaryerleriTrendyolRoute: PazaryerleriTrendyolRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
