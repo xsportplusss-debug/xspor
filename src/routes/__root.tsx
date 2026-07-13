@@ -80,21 +80,25 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Fintra — Ön Muhasebe Yönetim Paneli" },
+      { title: "Dashboard — Fintra Ön Muhasebe" },
       {
         name: "description",
         content:
-          "Fintra, satış-alış faturaları, cari, stok, banka, kasa ve pazaryeri yönetimini tek panelde birleştiren modern ön muhasebe çözümüdür.",
+          "Satış, kasa, banka, cari ve stok özetlerini tek bakışta görün.",
       },
       { name: "author", content: "Fintra" },
-      { property: "og:title", content: "Fintra — Ön Muhasebe Yönetim Paneli" },
+      { property: "og:title", content: "Dashboard — Fintra Ön Muhasebe" },
       {
         property: "og:description",
         content:
-          "Fatura, cari, stok, banka, pazaryeri ve raporları tek premium panelde yönetin.",
+          "Satış, kasa, banka, cari ve stok özetlerini tek bakışta görün.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Dashboard — Fintra Ön Muhasebe" },
+      { name: "twitter:description", content: "Satış, kasa, banka, cari ve stok özetlerini tek bakışta görün." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/8076c913-1d7d-423a-acb6-edab00e52ae4/id-preview-e18f1e20--3cf57f09-f566-43be-84a1-1122e44b9fa1.lovable.app-1783968192207.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/8076c913-1d7d-423a-acb6-edab00e52ae4/id-preview-e18f1e20--3cf57f09-f566-43be-84a1-1122e44b9fa1.lovable.app-1783968192207.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
