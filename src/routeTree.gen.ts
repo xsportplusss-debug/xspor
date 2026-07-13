@@ -9,19 +9,55 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UrunlerRouteImport } from './routes/urunler'
+import { Route as TedarikcilerRouteImport } from './routes/tedarikciler'
+import { Route as StokHareketleriRouteImport } from './routes/stok-hareketleri'
 import { Route as SatisFaturalariRouteImport } from './routes/satis-faturalari'
+import { Route as MusterilerRouteImport } from './routes/musteriler'
+import { Route as KategorilerRouteImport } from './routes/kategoriler'
 import { Route as EArsivRouteImport } from './routes/e-arsiv'
+import { Route as CariHesaplarRouteImport } from './routes/cari-hesaplar'
 import { Route as AlisFaturalariRouteImport } from './routes/alis-faturalari'
 import { Route as IndexRouteImport } from './routes/index'
 
+const UrunlerRoute = UrunlerRouteImport.update({
+  id: '/urunler',
+  path: '/urunler',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TedarikcilerRoute = TedarikcilerRouteImport.update({
+  id: '/tedarikciler',
+  path: '/tedarikciler',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StokHareketleriRoute = StokHareketleriRouteImport.update({
+  id: '/stok-hareketleri',
+  path: '/stok-hareketleri',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SatisFaturalariRoute = SatisFaturalariRouteImport.update({
   id: '/satis-faturalari',
   path: '/satis-faturalari',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MusterilerRoute = MusterilerRouteImport.update({
+  id: '/musteriler',
+  path: '/musteriler',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KategorilerRoute = KategorilerRouteImport.update({
+  id: '/kategoriler',
+  path: '/kategoriler',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EArsivRoute = EArsivRouteImport.update({
   id: '/e-arsiv',
   path: '/e-arsiv',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CariHesaplarRoute = CariHesaplarRouteImport.update({
+  id: '/cari-hesaplar',
+  path: '/cari-hesaplar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AlisFaturalariRoute = AlisFaturalariRouteImport.update({
@@ -38,39 +74,115 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alis-faturalari': typeof AlisFaturalariRoute
+  '/cari-hesaplar': typeof CariHesaplarRoute
   '/e-arsiv': typeof EArsivRoute
+  '/kategoriler': typeof KategorilerRoute
+  '/musteriler': typeof MusterilerRoute
   '/satis-faturalari': typeof SatisFaturalariRoute
+  '/stok-hareketleri': typeof StokHareketleriRoute
+  '/tedarikciler': typeof TedarikcilerRoute
+  '/urunler': typeof UrunlerRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alis-faturalari': typeof AlisFaturalariRoute
+  '/cari-hesaplar': typeof CariHesaplarRoute
   '/e-arsiv': typeof EArsivRoute
+  '/kategoriler': typeof KategorilerRoute
+  '/musteriler': typeof MusterilerRoute
   '/satis-faturalari': typeof SatisFaturalariRoute
+  '/stok-hareketleri': typeof StokHareketleriRoute
+  '/tedarikciler': typeof TedarikcilerRoute
+  '/urunler': typeof UrunlerRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/alis-faturalari': typeof AlisFaturalariRoute
+  '/cari-hesaplar': typeof CariHesaplarRoute
   '/e-arsiv': typeof EArsivRoute
+  '/kategoriler': typeof KategorilerRoute
+  '/musteriler': typeof MusterilerRoute
   '/satis-faturalari': typeof SatisFaturalariRoute
+  '/stok-hareketleri': typeof StokHareketleriRoute
+  '/tedarikciler': typeof TedarikcilerRoute
+  '/urunler': typeof UrunlerRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/alis-faturalari' | '/e-arsiv' | '/satis-faturalari'
+  fullPaths:
+    | '/'
+    | '/alis-faturalari'
+    | '/cari-hesaplar'
+    | '/e-arsiv'
+    | '/kategoriler'
+    | '/musteriler'
+    | '/satis-faturalari'
+    | '/stok-hareketleri'
+    | '/tedarikciler'
+    | '/urunler'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/alis-faturalari' | '/e-arsiv' | '/satis-faturalari'
-  id: '__root__' | '/' | '/alis-faturalari' | '/e-arsiv' | '/satis-faturalari'
+  to:
+    | '/'
+    | '/alis-faturalari'
+    | '/cari-hesaplar'
+    | '/e-arsiv'
+    | '/kategoriler'
+    | '/musteriler'
+    | '/satis-faturalari'
+    | '/stok-hareketleri'
+    | '/tedarikciler'
+    | '/urunler'
+  id:
+    | '__root__'
+    | '/'
+    | '/alis-faturalari'
+    | '/cari-hesaplar'
+    | '/e-arsiv'
+    | '/kategoriler'
+    | '/musteriler'
+    | '/satis-faturalari'
+    | '/stok-hareketleri'
+    | '/tedarikciler'
+    | '/urunler'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AlisFaturalariRoute: typeof AlisFaturalariRoute
+  CariHesaplarRoute: typeof CariHesaplarRoute
   EArsivRoute: typeof EArsivRoute
+  KategorilerRoute: typeof KategorilerRoute
+  MusterilerRoute: typeof MusterilerRoute
   SatisFaturalariRoute: typeof SatisFaturalariRoute
+  StokHareketleriRoute: typeof StokHareketleriRoute
+  TedarikcilerRoute: typeof TedarikcilerRoute
+  UrunlerRoute: typeof UrunlerRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/urunler': {
+      id: '/urunler'
+      path: '/urunler'
+      fullPath: '/urunler'
+      preLoaderRoute: typeof UrunlerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tedarikciler': {
+      id: '/tedarikciler'
+      path: '/tedarikciler'
+      fullPath: '/tedarikciler'
+      preLoaderRoute: typeof TedarikcilerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stok-hareketleri': {
+      id: '/stok-hareketleri'
+      path: '/stok-hareketleri'
+      fullPath: '/stok-hareketleri'
+      preLoaderRoute: typeof StokHareketleriRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/satis-faturalari': {
       id: '/satis-faturalari'
       path: '/satis-faturalari'
@@ -78,11 +190,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SatisFaturalariRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/musteriler': {
+      id: '/musteriler'
+      path: '/musteriler'
+      fullPath: '/musteriler'
+      preLoaderRoute: typeof MusterilerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kategoriler': {
+      id: '/kategoriler'
+      path: '/kategoriler'
+      fullPath: '/kategoriler'
+      preLoaderRoute: typeof KategorilerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/e-arsiv': {
       id: '/e-arsiv'
       path: '/e-arsiv'
       fullPath: '/e-arsiv'
       preLoaderRoute: typeof EArsivRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cari-hesaplar': {
+      id: '/cari-hesaplar'
+      path: '/cari-hesaplar'
+      fullPath: '/cari-hesaplar'
+      preLoaderRoute: typeof CariHesaplarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/alis-faturalari': {
@@ -105,8 +238,14 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlisFaturalariRoute: AlisFaturalariRoute,
+  CariHesaplarRoute: CariHesaplarRoute,
   EArsivRoute: EArsivRoute,
+  KategorilerRoute: KategorilerRoute,
+  MusterilerRoute: MusterilerRoute,
   SatisFaturalariRoute: SatisFaturalariRoute,
+  StokHareketleriRoute: StokHareketleriRoute,
+  TedarikcilerRoute: TedarikcilerRoute,
+  UrunlerRoute: UrunlerRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
