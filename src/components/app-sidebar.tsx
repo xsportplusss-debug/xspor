@@ -6,10 +6,8 @@ import {
   Archive,
   Users,
   UserSquare,
-  Truck,
   Package,
   Tags,
-  ArrowLeftRight,
   Landmark,
   Wallet,
   TrendingUp,
@@ -53,13 +51,11 @@ const salesItems = [
 const cariItems = [
   { title: "Cari Hesaplar", url: "/cari-hesaplar", icon: Users },
   { title: "Müşteriler", url: "/musteriler", icon: UserSquare },
-  { title: "Tedarikçiler", url: "/tedarikciler", icon: Truck },
 ];
 
 const stockItems = [
   { title: "Ürünler", url: "/urunler", icon: Package },
   { title: "Kategoriler", url: "/kategoriler", icon: Tags },
-  { title: "Stok Hareketleri", url: "/stok-hareketleri", icon: ArrowLeftRight },
 ];
 
 const financeItems = [
