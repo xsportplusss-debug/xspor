@@ -1,21 +1,19 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { StatCard } from "@/components/stat-card";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  Wallet, Landmark, TrendingUp, TrendingDown, Package, Clock,
-  ArrowUpRight, CircleDollarSign, ShoppingBag, AlertTriangle,
+  Wallet, Landmark, TrendingUp, TrendingDown, Package, ShoppingBag, ArrowUpRight, AlertTriangle,
 } from "lucide-react";
 import {
-  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid,
-  BarChart, Bar, Legend,
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid, Legend,
 } from "recharts";
-import { fmtTL, salesChart, incomeExpenseChart, salesInvoices, products } from "@/lib/mock-data";
+import { useMemo } from "react";
+import { fmtTL } from "@/lib/mock-data";
+import { useStore, bankBalance, cashBalance } from "@/lib/store";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -28,83 +26,83 @@ export const Route = createFileRoute("/")({
 });
 
 function Dashboard() {
+  const banks = useStore((s) => s.banks);
+  const cashes = useStore((s) => s.cashRegisters);
+  const salesInvoices = useStore((s) => s.salesInvoices);
+  const purchaseInvoices = useStore((s) => s.purchaseInvoices);
+  const products = useStore((s) => s.products);
+  const bankTx = useStore((s) => s.bankTx);
+  const cashTx = useStore((s) => s.cashTx);
+
+  const totalBank = banks.reduce((a, b) => a + bankBalance(b.id), 0);
+  const totalCash = cashes.reduce((a, c) => a + cashBalance(c.id), 0);
+  const monthSales = salesInvoices.reduce((a, b) => a + b.total, 0);
+  const monthBuys = purchaseInvoices.reduce((a, b) => a + b.total, 0);
+
+  const chart = useMemo(() => {
+    const map = new Map<string, { m: string; gelir: number; gider: number }>();
+    for (const t of [...bankTx, ...cashTx]) {
+      const key = (t.date || "").slice(0, 7) || "—";
+      if (!map.has(key)) map.set(key, { m: key, gelir: 0, gider: 0 });
+      const r = map.get(key)!;
+      if (t.amount >= 0) r.gelir += t.amount; else r.gider += -t.amount;
+    }
+    return [...map.values()].sort((a, b) => (a.m < b.m ? -1 : 1));
+  }, [bankTx, cashTx]);
+
+  const lowStock = products.filter((p) => p.minStock > 0 && p.stock < p.minStock);
+  const isEmpty = banks.length + cashes.length + salesInvoices.length + purchaseInvoices.length + products.length === 0;
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Hoş geldin, Ahmet 👋"
-        subtitle="Bugünün özeti ve son 7 günün performansı."
+        title="Hoş geldin 👋"
+        subtitle="Bugünün özeti ve genel bakış."
         actions={
-          <>
-            <Button variant="outline" size="sm">Bu Ay</Button>
+          <Link to="/satis-faturalari">
             <Button size="sm" className="gradient-primary text-primary-foreground shadow-elegant">
               <ArrowUpRight className="mr-1 h-4 w-4" /> Yeni Fatura
             </Button>
-          </>
+          </Link>
         }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Bugünkü Satış" value={fmtTL(24850.5)} icon={ShoppingBag} tone="primary" trend={12.4} />
-        <StatCard label="Aylık Satış" value={fmtTL(742380)} icon={TrendingUp} tone="success" trend={8.2} />
-        <StatCard label="Kasa Bakiyesi" value={fmtTL(45820.55)} icon={Wallet} tone="info" trend={-2.1} />
-        <StatCard label="Banka Bakiyesi" value={fmtTL(922172.05)} icon={Landmark} tone="primary" trend={3.6} />
-        <StatCard label="Toplam Alacak" value={fmtTL(456800)} icon={CircleDollarSign} tone="success" hint="12 açık cari" />
-        <StatCard label="Toplam Borç" value={fmtTL(112000)} icon={TrendingDown} tone="destructive" hint="4 açık cari" />
-        <StatCard label="Stok Değeri" value={fmtTL(1284500)} icon={Package} tone="info" hint="342 ürün" />
-        <StatCard label="Bekleyen Tahsilat" value={fmtTL(87320)} icon={Clock} tone="warning" hint="3 fatura" />
+        <StatCard label="Toplam Satış" value={fmtTL(monthSales)} icon={ShoppingBag} tone="primary" />
+        <StatCard label="Toplam Alış" value={fmtTL(monthBuys)} icon={TrendingDown} tone="warning" />
+        <StatCard label="Kasa" value={fmtTL(totalCash)} icon={Wallet} tone="info" hint={`${cashes.length} kasa`} />
+        <StatCard label="Banka" value={fmtTL(totalBank)} icon={Landmark} tone="success" hint={`${banks.length} hesap`} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="glass">
-          <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-            <div>
-              <CardTitle className="text-base">Satış / Alış</CardTitle>
-              <p className="text-xs text-muted-foreground">Son 7 ay</p>
+      {isEmpty && (
+        <Card className="glass border-dashed">
+          <CardContent className="grid place-items-center gap-3 p-10 text-center">
+            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-primary">
+              <Package className="h-7 w-7" />
             </div>
-            <Badge variant="secondary">₺ TL</Badge>
-          </CardHeader>
-          <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={salesChart}>
-                <defs>
-                  <linearGradient id="gSatis" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.5} />
-                    <stop offset="100%" stopColor="var(--color-chart-1)" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gAlis" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--color-chart-2)" stopOpacity={0.4} />
-                    <stop offset="100%" stopColor="var(--color-chart-2)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                <XAxis dataKey="m" tickLine={false} axisLine={false} className="text-xs" />
-                <YAxis tickFormatter={(v) => `${v / 1000}k`} tickLine={false} axisLine={false} className="text-xs" />
-                <RTooltip
-                  contentStyle={{ background: "var(--color-popover)", border: "1px solid var(--color-border)", borderRadius: 12 }}
-                  formatter={(v: number) => fmtTL(v)}
-                />
-                <Area type="monotone" dataKey="satis" name="Satış" stroke="var(--color-chart-1)" fill="url(#gSatis)" strokeWidth={2} />
-                <Area type="monotone" dataKey="alis" name="Alış" stroke="var(--color-chart-2)" fill="url(#gAlis)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
+            <div>
+              <div className="text-base font-semibold">Hoş geldin!</div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                Sol menüden Banka, Kasa, Cari ve Ürünler ekleyerek başlayın. Faturaları Excel/PDF, ürünleri XML ile içe aktarabilirsiniz.
+              </div>
+            </div>
           </CardContent>
         </Card>
+      )}
 
+      {chart.length > 0 && (
         <Card className="glass">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Gelir / Gider</CardTitle>
-            <p className="text-xs text-muted-foreground">Aylık karşılaştırma</p>
+            <CardTitle className="text-base">Gelir / Gider (Aylık)</CardTitle>
+            <p className="text-xs text-muted-foreground">Banka ve kasa hareketlerinden</p>
           </CardHeader>
           <CardContent className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={incomeExpenseChart}>
+              <BarChart data={chart}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                 <XAxis dataKey="m" tickLine={false} axisLine={false} className="text-xs" />
-                <YAxis tickFormatter={(v) => `${v / 1000}k`} tickLine={false} axisLine={false} className="text-xs" />
-                <RTooltip
-                  contentStyle={{ background: "var(--color-popover)", border: "1px solid var(--color-border)", borderRadius: 12 }}
-                  formatter={(v: number) => fmtTL(v)}
-                />
+                <YAxis tickFormatter={(v) => `${Math.round(v / 1000)}k`} tickLine={false} axisLine={false} className="text-xs" />
+                <RTooltip contentStyle={{ background: "var(--color-popover)", border: "1px solid var(--color-border)", borderRadius: 12 }} formatter={(v: number) => fmtTL(v)} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Bar dataKey="gelir" name="Gelir" fill="var(--color-chart-3)" radius={[6, 6, 0, 0]} />
                 <Bar dataKey="gider" name="Gider" fill="var(--color-chart-5)" radius={[6, 6, 0, 0]} />
@@ -112,23 +110,21 @@ function Dashboard() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
-      </div>
+      )}
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="glass lg:col-span-2">
+      {salesInvoices.length > 0 && (
+        <Card className="glass">
           <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-base">Son Satışlar</CardTitle>
-            <Button variant="ghost" size="sm">Tümünü Gör</Button>
+            <Link to="/satis-faturalari"><Button variant="ghost" size="sm">Tümünü Gör</Button></Link>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Fatura</TableHead>
-                    <TableHead>Müşteri</TableHead>
-                    <TableHead>Tarih</TableHead>
-                    <TableHead>Durum</TableHead>
+                    <TableHead>Fatura</TableHead><TableHead>Müşteri</TableHead>
+                    <TableHead>Tarih</TableHead><TableHead>Durum</TableHead>
                     <TableHead className="text-right">Tutar</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -138,11 +134,7 @@ function Dashboard() {
                       <TableCell className="font-medium">{s.no}</TableCell>
                       <TableCell className="max-w-[180px] truncate">{s.party}</TableCell>
                       <TableCell className="text-muted-foreground">{s.date}</TableCell>
-                      <TableCell>
-                        <Badge variant={s.payment === "Tahsil Edildi" ? "default" : s.payment === "Kısmi" ? "secondary" : "outline"}>
-                          {s.payment}
-                        </Badge>
-                      </TableCell>
+                      <TableCell><Badge variant={s.payment === "Tahsil Edildi" ? "default" : "outline"}>{s.payment}</Badge></TableCell>
                       <TableCell className="text-right font-semibold">{fmtTL(s.total)}</TableCell>
                     </TableRow>
                   ))}
@@ -151,57 +143,32 @@ function Dashboard() {
             </div>
           </CardContent>
         </Card>
+      )}
 
+      {lowStock.length > 0 && (
         <Card className="glass">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Yaklaşan Ödemeler</CardTitle>
-            <p className="text-xs text-muted-foreground">Önümüzdeki 7 gün</p>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {[
-              { name: "Global Elektronik", date: "14 Tem", amount: 68900 },
-              { name: "Star Ambalaj", date: "16 Tem", amount: 12300 },
-              { name: "Ofis Kirası", date: "18 Tem", amount: 25000 },
-              { name: "Mercan Tekstil", date: "20 Tem", amount: 87600 },
-            ].map((p, i) => (
-              <div key={i} className="flex items-center justify-between rounded-xl border bg-muted/30 p-3">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">{p.name}</div>
-                  <div className="text-xs text-muted-foreground">{p.date}</div>
-                </div>
-                <div className="text-sm font-semibold">{fmtTL(p.amount)}</div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="glass">
-        <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-          <div>
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-base">
               <AlertTriangle className="h-4 w-4 text-warning" />
               Düşük Stok Uyarıları
             </CardTitle>
-            <p className="text-xs text-muted-foreground">Minimum stok altına düşen ürünler</p>
-          </div>
-          <Button variant="ghost" size="sm">Sipariş Ver</Button>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {products.filter((p) => p.stock < p.minStock).map((p) => (
-              <div key={p.id} className="rounded-xl border bg-warning/5 p-3">
-                <div className="text-sm font-semibold">{p.name}</div>
-                <div className="text-xs text-muted-foreground">{p.sku} · {p.category}</div>
-                <div className="mt-2 flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Stok</span>
-                  <span className="font-semibold text-warning">{p.stock} / min {p.minStock}</span>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {lowStock.map((p) => (
+                <div key={p.id} className="rounded-xl border bg-warning/5 p-3">
+                  <div className="text-sm font-semibold">{p.name}</div>
+                  <div className="text-xs text-muted-foreground">{p.sku} · {p.category}</div>
+                  <div className="mt-2 flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Stok</span>
+                    <span className="font-semibold text-warning">{p.stock} / min {p.minStock}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
