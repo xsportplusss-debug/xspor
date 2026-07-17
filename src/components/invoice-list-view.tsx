@@ -1,0 +1,278 @@
+import { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { FileSpreadsheet, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { fmtTL, type Invoice } from "@/lib/mock-data";
+import { ExcelImportDialog } from "@/components/excel-import-dialog";
+import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
+import { useSelection } from "@/hooks/use-selection";
+import { INVOICE_TEMPLATE_HEADERS, rowsToInvoices } from "@/lib/importers";
+
+type Props = {
+  title: string;
+  partyLabel: string; // "Müşteri" | "Tedarikçi"
+  newPrefix: string; // "SF" | "AF"
+  list: Invoice[];
+  add: (v: Omit<Invoice, "id">) => void;
+  bulkAdd: (v: Omit<Invoice, "id">[]) => void;
+  update: (id: string, patch: Partial<Invoice>) => void;
+  remove: (id: string) => void;
+  bulkRemove: (ids: string[]) => void;
+};
+
+const emptyForm = (prefix: string): Omit<Invoice, "id"> => ({
+  no: `${prefix}-${Date.now().toString().slice(-6)}`,
+  date: new Date().toISOString().slice(0, 10),
+  party: "",
+  subtotal: 0,
+  vat: 0,
+  discount: 0,
+  total: 0,
+  status: "Onaylı",
+  payment: "Bekliyor",
+});
+
+export function InvoiceListView({
+  title, partyLabel, newPrefix, list, add, bulkAdd, update, remove, bulkRemove,
+}: Props) {
+  const [q, setQ] = useState("");
+  const [openNew, setOpenNew] = useState(false);
+  const [form, setForm] = useState<Omit<Invoice, "id">>(emptyForm(newPrefix));
+  const [editing, setEditing] = useState<Invoice | null>(null);
+
+  const filtered = list.filter(
+    (s) => s.no.toLowerCase().includes(q.toLowerCase()) || s.party.toLowerCase().includes(q.toLowerCase()),
+  );
+  const sel = useSelection(filtered);
+
+  function calcTotal(f: Omit<Invoice, "id">) {
+    return (f.subtotal ?? 0) + (f.vat ?? 0) - (f.discount ?? 0);
+  }
+
+  function saveNew() {
+    if (!form.party) return toast.error(`${partyLabel} girin`);
+    const total = form.total || calcTotal(form);
+    add({ ...form, total });
+    setOpenNew(false);
+    setForm(emptyForm(newPrefix));
+    toast.success("Kaydedildi");
+  }
+
+  function saveEdit() {
+    if (!editing) return;
+    const total = editing.total || calcTotal(editing);
+    update(editing.id, { ...editing, total });
+    setEditing(null);
+    toast.success("Güncellendi");
+  }
+
+  function bulkDelete() {
+    bulkRemove(sel.selectedIds);
+    toast.success(`${sel.selectedIds.length} kayıt silindi`);
+    sel.clear();
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title={title}
+        subtitle={`${list.length} kayıt`}
+        actions={
+          <>
+            <ExcelImportDialog
+              title={`${title} — Excel içe aktar`}
+              description="Şablon başlıklarına göre otomatik eşlenir. Farklı yazımlar da tanınır (örn. 'Firma' / 'Müşteri')."
+              templateName={`${title.toLowerCase().replace(/\s+/g, "-")}-sablon.xlsx`}
+              templateHeaders={INVOICE_TEMPLATE_HEADERS}
+              templateSample={[["FTR2026000001", new Date(), "Örnek Firma A.Ş.", 1000, 200, 0, 1200]]}
+              onImport={(rows) => { const l = rowsToInvoices(rows); bulkAdd(l); return l.length; }}
+              trigger={<Button variant="outline" size="sm"><FileSpreadsheet className="mr-1 h-4 w-4" /> Excel İçe Aktar</Button>}
+            />
+            <Dialog open={openNew} onOpenChange={(v) => { setOpenNew(v); if (v) setForm(emptyForm(newPrefix)); }}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="gradient-primary text-primary-foreground shadow-elegant">
+                  <Plus className="mr-1 h-4 w-4" /> Yeni {title.split(" ")[0]} Faturası
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader><DialogTitle>Yeni {title}</DialogTitle></DialogHeader>
+                <InvoiceForm value={form} onChange={setForm} partyLabel={partyLabel} />
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setOpenNew(false)}>İptal</Button>
+                  <Button onClick={saveNew} className="gradient-primary text-primary-foreground">Kaydet</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </>
+        }
+      />
+
+      {list.length === 0 ? (
+        <EmptyState title={`Henüz ${title.toLowerCase()} yok`} desc="Yeni fatura oluşturun veya Excel'den içe aktarın." />
+      ) : (
+        <Card className="glass">
+          <CardContent className="p-4">
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <div className="relative min-w-[220px] flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Fatura no veya firma ara..." className="pl-9" />
+              </div>
+              {sel.selectedIds.length > 0 && (
+                <Button variant="destructive" size="sm" onClick={bulkDelete}>
+                  <Trash2 className="mr-1 h-4 w-4" /> Seçilenleri Sil ({sel.selectedIds.length})
+                </Button>
+              )}
+            </div>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={sel.allChecked ? true : sel.someChecked ? "indeterminate" : false}
+                        onCheckedChange={sel.toggleAll}
+                      />
+                    </TableHead>
+                    <TableHead>Fatura No</TableHead>
+                    <TableHead>Tarih</TableHead>
+                    <TableHead>{partyLabel}</TableHead>
+                    <TableHead className="text-right">KDV Hariç</TableHead>
+                    <TableHead className="text-right">KDV</TableHead>
+                    <TableHead className="text-right">İskonto</TableHead>
+                    <TableHead className="text-right">Genel Toplam</TableHead>
+                    <TableHead>Durum</TableHead>
+                    <TableHead className="w-20"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((s) => (
+                    <TableRow key={s.id} data-state={sel.selected.has(s.id) ? "selected" : undefined}>
+                      <TableCell>
+                        <Checkbox checked={sel.selected.has(s.id)} onCheckedChange={() => sel.toggle(s.id)} />
+                      </TableCell>
+                      <TableCell className="font-medium">{s.no}</TableCell>
+                      <TableCell className="text-muted-foreground">{s.date}</TableCell>
+                      <TableCell className="max-w-[240px] truncate">{s.party}</TableCell>
+                      <TableCell className="text-right">{s.subtotal ? fmtTL(s.subtotal) : "—"}</TableCell>
+                      <TableCell className="text-right">{s.vat ? fmtTL(s.vat) : "—"}</TableCell>
+                      <TableCell className="text-right">{s.discount ? fmtTL(s.discount) : "—"}</TableCell>
+                      <TableCell className="text-right font-semibold">{fmtTL(s.total)}</TableCell>
+                      <TableCell>
+                        <Badge variant={s.status === "Onaylı" ? "default" : s.status === "Taslak" ? "secondary" : "destructive"}>{s.status}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => setEditing(s)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => { remove(s.id); toast.success("Silindi"); }}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Dialog open={!!editing} onOpenChange={(v) => !v && setEditing(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Faturayı Düzenle</DialogTitle></DialogHeader>
+          {editing && (
+            <InvoiceForm
+              value={editing}
+              onChange={(v) => setEditing({ ...editing, ...v })}
+              partyLabel={partyLabel}
+              editing
+            />
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditing(null)}>İptal</Button>
+            <Button onClick={saveEdit} className="gradient-primary text-primary-foreground">Güncelle</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function InvoiceForm({
+  value, onChange, partyLabel, editing,
+}: {
+  value: Omit<Invoice, "id"> | Invoice;
+  onChange: (v: any) => void;
+  partyLabel: string;
+  editing?: boolean;
+}) {
+  const set = (patch: Partial<Invoice>) => onChange({ ...value, ...patch });
+  const auto = (value.subtotal ?? 0) + (value.vat ?? 0) - (value.discount ?? 0);
+  return (
+    <div className="grid gap-3">
+      <div className="grid grid-cols-2 gap-2">
+        <div><Label>Fatura No</Label><Input value={value.no} onChange={(e) => set({ no: e.target.value })} /></div>
+        <div><Label>Tarih</Label><Input type="date" value={value.date} onChange={(e) => set({ date: e.target.value })} /></div>
+      </div>
+      <div><Label>{partyLabel}</Label><Input value={value.party} onChange={(e) => set({ party: e.target.value })} /></div>
+      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <Label>KDV Hariç</Label>
+          <Input type="number" value={value.subtotal ?? 0} onChange={(e) => set({ subtotal: +e.target.value })} />
+        </div>
+        <div>
+          <Label>KDV</Label>
+          <Input type="number" value={value.vat ?? 0} onChange={(e) => set({ vat: +e.target.value })} />
+        </div>
+        <div>
+          <Label>İskonto</Label>
+          <Input type="number" value={value.discount ?? 0} onChange={(e) => set({ discount: +e.target.value })} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <Label>Genel Toplam</Label>
+          <Input type="number" value={value.total} onChange={(e) => set({ total: +e.target.value })} placeholder={String(auto)} />
+          <p className="mt-1 text-xs text-muted-foreground">Boş bırakırsanız otomatik: {fmtTL(auto)}</p>
+        </div>
+        <div>
+          <Label>Durum</Label>
+          <Select value={value.status} onValueChange={(v) => set({ status: v as any })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Onaylı">Onaylı</SelectItem>
+              <SelectItem value="Taslak">Taslak</SelectItem>
+              <SelectItem value="İptal">İptal</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div>
+        <Label>Tahsilat</Label>
+        <Select value={value.payment} onValueChange={(v) => set({ payment: v as any })}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Bekliyor">Bekliyor</SelectItem>
+            <SelectItem value="Kısmi">Kısmi</SelectItem>
+            <SelectItem value="Tahsil Edildi">Tahsil Edildi</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+}
