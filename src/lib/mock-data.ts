@@ -10,6 +10,9 @@ export type Invoice = {
   status: "Onaylı" | "Taslak" | "İptal";
   payment: "Tahsil Edildi" | "Kısmi" | "Bekliyor";
   total: number;
+  subtotal?: number;
+  vat?: number;
+  discount?: number;
 };
 
 export type Cari = {
