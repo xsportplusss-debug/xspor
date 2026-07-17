@@ -20,22 +20,32 @@ type Actions = {
   // sales
   addSales: (v: Omit<Invoice, "id">) => void;
   bulkAddSales: (v: Omit<Invoice, "id">[]) => void;
+  updateSales: (id: string, patch: Partial<Invoice>) => void;
   removeSales: (id: string) => void;
+  bulkRemoveSales: (ids: string[]) => void;
   // purchase
   addPurchase: (v: Omit<Invoice, "id">) => void;
   bulkAddPurchase: (v: Omit<Invoice, "id">[]) => void;
+  updatePurchase: (id: string, patch: Partial<Invoice>) => void;
   removePurchase: (id: string) => void;
+  bulkRemovePurchase: (ids: string[]) => void;
   // cari
   addCari: (v: Omit<Cari, "id">) => void;
+  updateCari: (id: string, patch: Partial<Cari>) => void;
   removeCari: (id: string) => void;
+  bulkRemoveCari: (ids: string[]) => void;
   // products
   addProduct: (v: Omit<Product, "id">) => void;
   bulkAddProducts: (v: Omit<Product, "id">[]) => void;
+  updateProduct: (id: string, patch: Partial<Product>) => void;
   removeProduct: (id: string) => void;
+  bulkRemoveProducts: (ids: string[]) => void;
   // categories
   addCategory: (name: string) => void;
   ensureCategory: (name: string) => void;
+  updateCategory: (id: string, name: string) => void;
   removeCategory: (id: string) => void;
+  bulkRemoveCategories: (ids: string[]) => void;
   // banks
   addBank: (v: Omit<Bank, "id">) => void;
   removeBank: (id: string) => void;
@@ -43,12 +53,14 @@ type Actions = {
   bulkAddBankTx: (v: Omit<BankTx, "id">[]) => void;
   updateBankTx: (id: string, patch: Partial<BankTx>) => void;
   removeBankTx: (id: string) => void;
+  bulkRemoveBankTx: (ids: string[]) => void;
   // cash
   addCash: (v: Omit<CashRegister, "id">) => void;
   removeCash: (id: string) => void;
   addCashTx: (v: Omit<CashTx, "id">) => void;
   updateCashTx: (id: string, patch: Partial<CashTx>) => void;
   removeCashTx: (id: string) => void;
+  bulkRemoveCashTx: (ids: string[]) => void;
   // meta
   resetAll: () => void;
 };
@@ -72,28 +84,35 @@ export const useStore = create<State & Actions>()(
 
       addSales: (v) => set((s) => ({ salesInvoices: [{ ...v, id: uid() }, ...s.salesInvoices] })),
       bulkAddSales: (list) => set((s) => ({ salesInvoices: [...list.map((v) => ({ ...v, id: uid() })), ...s.salesInvoices] })),
+      updateSales: (id, patch) => set((s) => ({ salesInvoices: s.salesInvoices.map((x) => x.id === id ? { ...x, ...patch } : x) })),
       removeSales: (id) => set((s) => ({ salesInvoices: s.salesInvoices.filter((x) => x.id !== id) })),
+      bulkRemoveSales: (ids) => set((s) => ({ salesInvoices: s.salesInvoices.filter((x) => !ids.includes(x.id)) })),
 
       addPurchase: (v) => set((s) => ({ purchaseInvoices: [{ ...v, id: uid() }, ...s.purchaseInvoices] })),
       bulkAddPurchase: (list) => set((s) => ({ purchaseInvoices: [...list.map((v) => ({ ...v, id: uid() })), ...s.purchaseInvoices] })),
+      updatePurchase: (id, patch) => set((s) => ({ purchaseInvoices: s.purchaseInvoices.map((x) => x.id === id ? { ...x, ...patch } : x) })),
       removePurchase: (id) => set((s) => ({ purchaseInvoices: s.purchaseInvoices.filter((x) => x.id !== id) })),
+      bulkRemovePurchase: (ids) => set((s) => ({ purchaseInvoices: s.purchaseInvoices.filter((x) => !ids.includes(x.id)) })),
 
       addCari: (v) => set((s) => ({ cariList: [{ ...v, id: uid() }, ...s.cariList] })),
+      updateCari: (id, patch) => set((s) => ({ cariList: s.cariList.map((x) => x.id === id ? { ...x, ...patch } : x) })),
       removeCari: (id) => set((s) => ({ cariList: s.cariList.filter((x) => x.id !== id) })),
+      bulkRemoveCari: (ids) => set((s) => ({ cariList: s.cariList.filter((x) => !ids.includes(x.id)) })),
 
       addProduct: (v) => set((s) => ({ products: [{ ...v, id: uid() }, ...s.products] })),
       bulkAddProducts: (list) => set((s) => {
         const now = s.products;
         const added: Product[] = [];
         for (const p of list) {
-          // barkod veya sku aynıysa atla
           if (p.barcode && now.some((x) => x.barcode === p.barcode)) continue;
           if (p.sku && now.some((x) => x.sku === p.sku)) continue;
           added.push({ ...p, id: uid() });
         }
         return { products: [...added, ...now] };
       }),
+      updateProduct: (id, patch) => set((s) => ({ products: s.products.map((x) => x.id === id ? { ...x, ...patch } : x) })),
       removeProduct: (id) => set((s) => ({ products: s.products.filter((x) => x.id !== id) })),
+      bulkRemoveProducts: (ids) => set((s) => ({ products: s.products.filter((x) => !ids.includes(x.id)) })),
 
       addCategory: (name) => set((s) => ({ categories: [...s.categories, { id: uid(), name }] })),
       ensureCategory: (name) => set((s) => (
@@ -101,7 +120,9 @@ export const useStore = create<State & Actions>()(
           ? s
           : { categories: [...s.categories, { id: uid(), name }] }
       )),
+      updateCategory: (id, name) => set((s) => ({ categories: s.categories.map((x) => x.id === id ? { ...x, name } : x) })),
       removeCategory: (id) => set((s) => ({ categories: s.categories.filter((x) => x.id !== id) })),
+      bulkRemoveCategories: (ids) => set((s) => ({ categories: s.categories.filter((x) => !ids.includes(x.id)) })),
 
       addBank: (v) => set((s) => ({ banks: [{ ...v, id: uid() }, ...s.banks] })),
       removeBank: (id) => set((s) => ({
@@ -112,6 +133,7 @@ export const useStore = create<State & Actions>()(
       bulkAddBankTx: (list) => set((s) => ({ bankTx: [...list.map((v) => ({ ...v, id: uid() })), ...s.bankTx] })),
       updateBankTx: (id, patch) => set((s) => ({ bankTx: s.bankTx.map((x) => x.id === id ? { ...x, ...patch } : x) })),
       removeBankTx: (id) => set((s) => ({ bankTx: s.bankTx.filter((x) => x.id !== id) })),
+      bulkRemoveBankTx: (ids) => set((s) => ({ bankTx: s.bankTx.filter((x) => !ids.includes(x.id)) })),
 
       addCash: (v) => set((s) => ({ cashRegisters: [{ ...v, id: uid() }, ...s.cashRegisters] })),
       removeCash: (id) => set((s) => ({
@@ -121,6 +143,7 @@ export const useStore = create<State & Actions>()(
       addCashTx: (v) => set((s) => ({ cashTx: [{ ...v, id: uid() }, ...s.cashTx] })),
       updateCashTx: (id, patch) => set((s) => ({ cashTx: s.cashTx.map((x) => x.id === id ? { ...x, ...patch } : x) })),
       removeCashTx: (id) => set((s) => ({ cashTx: s.cashTx.filter((x) => x.id !== id) })),
+      bulkRemoveCashTx: (ids) => set((s) => ({ cashTx: s.cashTx.filter((x) => !ids.includes(x.id)) })),
 
       resetAll: () => set(() => ({ ...initial })),
     }),
@@ -128,7 +151,6 @@ export const useStore = create<State & Actions>()(
   ),
 );
 
-// Türev seçiciler
 export function bankBalance(bankId: string) {
   const s = useStore.getState();
   const b = s.banks.find((x) => x.id === bankId);
