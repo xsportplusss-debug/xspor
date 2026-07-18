@@ -134,7 +134,7 @@ function Dashboard() {
                       <TableCell className="font-medium">{s.no}</TableCell>
                       <TableCell className="max-w-[180px] truncate">{s.party}</TableCell>
                       <TableCell className="text-muted-foreground">{s.date}</TableCell>
-                      <TableCell><Badge variant={s.payment === "Tahsil Edildi" ? "default" : "outline"}>{s.payment}</Badge></TableCell>
+                      <TableCell><Badge variant={s.status === "Tahsil Edildi" ? "default" : "outline"}>{s.status}</Badge></TableCell>
                       <TableCell className="text-right font-semibold">{fmtTL(s.total)}</TableCell>
                     </TableRow>
                   ))}
