@@ -7,7 +7,6 @@ import {
   Users,
   UserSquare,
   Package,
-  Tags,
   Landmark,
   Wallet,
   TrendingUp,
@@ -57,7 +56,6 @@ const cariItems = [
 
 const stockItems = [
   { title: "Ürünler", url: "/urunler", icon: Package },
-  { title: "Kategoriler", url: "/kategoriler", icon: Tags },
 ];
 
 const financeItems = [
