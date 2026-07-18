@@ -158,9 +158,9 @@ function Page() {
           {/* Üst blok: sol firma metni + sağ logo & QR */}
           <div className="flex flex-col gap-6 border-b pb-6 md:flex-row md:items-start md:justify-between">
             <div className="max-w-md">
-              <div className="text-2xl font-extrabold tracking-tight text-primary">{company.name}</div>
-              <div className="mt-1 text-sm font-medium">{company.tagline}</div>
-              {company.owner && <div className="text-sm text-muted-foreground">{company.owner}</div>}
+              <div className="text-2xl font-extrabold tracking-tight text-primary">
+                {company.name} {company.tagline} - {company.owner}
+              </div>
               <div className="mt-4 grid gap-1 text-xs text-muted-foreground">
                 {company.phone && <div><span className="font-medium text-foreground">Tel:</span> {company.phone}</div>}
                 {company.web && <div><span className="font-medium text-foreground">Web:</span> {company.web}</div>}
