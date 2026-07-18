@@ -15,7 +15,6 @@ import { Route as SatisFaturalariRouteImport } from './routes/satis-faturalari'
 import { Route as RaporlarRouteImport } from './routes/raporlar'
 import { Route as MusterilerRouteImport } from './routes/musteriler'
 import { Route as KullanicilarRouteImport } from './routes/kullanicilar'
-import { Route as KategorilerRouteImport } from './routes/kategoriler'
 import { Route as KasaRouteImport } from './routes/kasa'
 import { Route as GiderlerRouteImport } from './routes/giderler'
 import { Route as GelirlerRouteImport } from './routes/gelirler'
@@ -63,11 +62,6 @@ const MusterilerRoute = MusterilerRouteImport.update({
 const KullanicilarRoute = KullanicilarRouteImport.update({
   id: '/kullanicilar',
   path: '/kullanicilar',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const KategorilerRoute = KategorilerRouteImport.update({
-  id: '/kategoriler',
-  path: '/kategoriler',
   getParentRoute: () => rootRouteImport,
 } as any)
 const KasaRoute = KasaRouteImport.update({
@@ -173,7 +167,6 @@ export interface FileRoutesByFullPath {
   '/gelirler': typeof GelirlerRoute
   '/giderler': typeof GiderlerRoute
   '/kasa': typeof KasaRouteWithChildren
-  '/kategoriler': typeof KategorilerRoute
   '/kullanicilar': typeof KullanicilarRoute
   '/musteriler': typeof MusterilerRoute
   '/raporlar': typeof RaporlarRoute
@@ -200,7 +193,6 @@ export interface FileRoutesByTo {
   '/gelirler': typeof GelirlerRoute
   '/giderler': typeof GiderlerRoute
   '/kasa': typeof KasaRouteWithChildren
-  '/kategoriler': typeof KategorilerRoute
   '/kullanicilar': typeof KullanicilarRoute
   '/musteriler': typeof MusterilerRoute
   '/raporlar': typeof RaporlarRoute
@@ -228,7 +220,6 @@ export interface FileRoutesById {
   '/gelirler': typeof GelirlerRoute
   '/giderler': typeof GiderlerRoute
   '/kasa': typeof KasaRouteWithChildren
-  '/kategoriler': typeof KategorilerRoute
   '/kullanicilar': typeof KullanicilarRoute
   '/musteriler': typeof MusterilerRoute
   '/raporlar': typeof RaporlarRoute
@@ -257,7 +248,6 @@ export interface FileRouteTypes {
     | '/gelirler'
     | '/giderler'
     | '/kasa'
-    | '/kategoriler'
     | '/kullanicilar'
     | '/musteriler'
     | '/raporlar'
@@ -284,7 +274,6 @@ export interface FileRouteTypes {
     | '/gelirler'
     | '/giderler'
     | '/kasa'
-    | '/kategoriler'
     | '/kullanicilar'
     | '/musteriler'
     | '/raporlar'
@@ -311,7 +300,6 @@ export interface FileRouteTypes {
     | '/gelirler'
     | '/giderler'
     | '/kasa'
-    | '/kategoriler'
     | '/kullanicilar'
     | '/musteriler'
     | '/raporlar'
@@ -339,7 +327,6 @@ export interface RootRouteChildren {
   GelirlerRoute: typeof GelirlerRoute
   GiderlerRoute: typeof GiderlerRoute
   KasaRoute: typeof KasaRouteWithChildren
-  KategorilerRoute: typeof KategorilerRoute
   KullanicilarRoute: typeof KullanicilarRoute
   MusterilerRoute: typeof MusterilerRoute
   RaporlarRoute: typeof RaporlarRoute
@@ -395,13 +382,6 @@ declare module '@tanstack/react-router' {
       path: '/kullanicilar'
       fullPath: '/kullanicilar'
       preLoaderRoute: typeof KullanicilarRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/kategoriler': {
-      id: '/kategoriler'
-      path: '/kategoriler'
-      fullPath: '/kategoriler'
-      preLoaderRoute: typeof KategorilerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/kasa': {
@@ -567,7 +547,6 @@ const rootRouteChildren: RootRouteChildren = {
   GelirlerRoute: GelirlerRoute,
   GiderlerRoute: GiderlerRoute,
   KasaRoute: KasaRouteWithChildren,
-  KategorilerRoute: KategorilerRoute,
   KullanicilarRoute: KullanicilarRoute,
   MusterilerRoute: MusterilerRoute,
   RaporlarRoute: RaporlarRoute,
@@ -583,13 +562,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

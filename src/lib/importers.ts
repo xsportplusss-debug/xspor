@@ -169,16 +169,20 @@ export function rowsToProducts(rows: Row[]): Omit<Product, "id">[] {
 }
 
 // ---------- Banka hareketleri ----------
+// Desteklenen başlıklar: TARİH, ÖDEME YAPILAN FİRMA / AÇIKLAMA, GELEN / GİRİŞ / ALACAK,
+// GİDEN / ÇIKIŞ / BORÇ, ÖZET / BAKİYE, TUTAR.
 export function rowsToBankTx(rows: Row[], bankId: string): Omit<BankTx, "id">[] {
   return rows.map((r) => {
-    const dep = NUM(pick(r, ["giris", "alacak", "credit", "in"]));
-    const wit = NUM(pick(r, ["cikis", "borc", "debit", "out"]));
+    const dep = NUM(pick(r, ["gelen", "giris", "alacak", "credit", "in"]));
+    const wit = NUM(pick(r, ["giden", "cikis", "borc", "debit", "out"]));
     const combined = NUM(pick(r, ["tutar", "amount"]));
-    const amount = dep - wit || combined;
+    const amount = (dep - wit) || combined;
     return {
       bankId,
       date: DATE(pick(r, ["tarih", "date"])) || new Date().toISOString().slice(0, 10),
-      description: STR(pick(r, ["aciklama", "desc", "description"])) || "İçe aktarıldı",
+      description:
+        STR(pick(r, ["odeme yapilan firma", "aciklama", "desc", "description", "firma"])) ||
+        "İçe aktarıldı",
       category: STR(pick(r, ["kategori", "category"])) || undefined,
       amount,
     };
