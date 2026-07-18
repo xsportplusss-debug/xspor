@@ -196,44 +196,67 @@ function Page() {
             </div>
           </div>
 
-          {/* Cari */}
-          <div className="mt-6 rounded-lg border bg-muted/20 p-4">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sayın</div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div><Label className="text-xs">Ünvan</Label>
-                <Input value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} className="border-0 border-b rounded-none bg-transparent px-0" />
+          {/* Cari — kompakt */}
+          <div className="mt-6 rounded-lg border bg-muted/20 p-3">
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Sayın</div>
+            <div className="grid gap-x-3 gap-y-2 md:grid-cols-4">
+              <div className="md:col-span-2">
+                <Label className="text-[11px]">Ünvan</Label>
+                <Input value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
+                  className="h-8 border-0 border-b rounded-none bg-transparent px-0 text-sm" />
               </div>
-              <div><Label className="text-xs">Vergi No / TCKN</Label>
-                <Input value={customer.taxNo} onChange={(e) => setCustomer({ ...customer, taxNo: e.target.value })} className="border-0 border-b rounded-none bg-transparent px-0" />
+              <div><Label className="text-[11px]">Vergi No / TCKN</Label>
+                <Input value={customer.taxNo} onChange={(e) => setCustomer({ ...customer, taxNo: e.target.value })}
+                  className="h-8 border-0 border-b rounded-none bg-transparent px-0 text-sm" />
               </div>
-              <div className="md:col-span-2"><Label className="text-xs">Adres</Label>
-                <Input value={customer.address} onChange={(e) => setCustomer({ ...customer, address: e.target.value })} className="border-0 border-b rounded-none bg-transparent px-0" />
+              <div><Label className="text-[11px]">Telefon</Label>
+                <Input value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
+                  className="h-8 border-0 border-b rounded-none bg-transparent px-0 text-sm" />
               </div>
-              <div><Label className="text-xs">Telefon</Label>
-                <Input value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} className="border-0 border-b rounded-none bg-transparent px-0" />
+              <div className="md:col-span-3"><Label className="text-[11px]">Adres</Label>
+                <Input value={customer.address} onChange={(e) => setCustomer({ ...customer, address: e.target.value })}
+                  className="h-8 border-0 border-b rounded-none bg-transparent px-0 text-sm" />
               </div>
-              <div><Label className="text-xs">E-posta</Label>
-                <Input value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} className="border-0 border-b rounded-none bg-transparent px-0" />
+              <div><Label className="text-[11px]">E-posta</Label>
+                <Input value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })}
+                  className="h-8 border-0 border-b rounded-none bg-transparent px-0 text-sm" />
               </div>
             </div>
           </div>
 
-          {/* Toplu araç barı — çıktıda gizli */}
-          <div className="mt-6 flex flex-wrap items-end gap-3 rounded-lg border bg-muted/10 p-3 print:hidden">
+          {/* Manuel kur + toplu araç — çıktıda gizli */}
+          <div className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border bg-muted/10 p-3 print:hidden">
+            <div>
+              <Label className="text-xs">Döviz</Label>
+              <Select value={docCurrency} onValueChange={(v) => setDocCurrency(v as Currency)}>
+                <SelectTrigger className="h-9 w-24"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="USD">USD ($)</SelectItem>
+                  <SelectItem value="EUR">EUR (€)</SelectItem>
+                  <SelectItem value="TRY">TRY (₺)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Manuel Kur (1 {docCurrency} = ? ₺)</Label>
+              <Input type="number" step="0.0001" value={manualRate}
+                onChange={(e) => setManualRate(+e.target.value)} className="h-9 w-32" />
+            </div>
+            <div className="h-9 w-px bg-border" />
             <div className="text-xs text-muted-foreground">
-              {selected.size > 0 ? `${selected.size} satır seçili` : "Uygulamak için satır seçin"}
+              {selected.size > 0 ? `${selected.size} satır seçili` : "Toplu için satır seçin"}
             </div>
             <div>
               <Label className="text-xs">Seçilenlere % artış</Label>
               <div className="flex items-center gap-1">
-                <Input type="number" value={bulkMarkup} onChange={(e) => setBulkMarkup(+e.target.value)} className="w-24" />
+                <Input type="number" value={bulkMarkup} onChange={(e) => setBulkMarkup(+e.target.value)} className="h-9 w-20" />
                 <Button size="sm" variant="outline" onClick={applyBulkMarkup}><Percent className="h-3.5 w-3.5" /></Button>
               </div>
             </div>
             <div>
-              <Label className="text-xs">Genel İskonto</Label>
+              <Label className="text-xs">Genel İskonto %</Label>
               <div className="flex items-center gap-1">
-                <Input type="number" value={bulkDiscount} onChange={(e) => setBulkDiscount(+e.target.value)} className="w-24" />
+                <Input type="number" value={bulkDiscount} onChange={(e) => setBulkDiscount(+e.target.value)} className="h-9 w-20" />
                 <Button size="sm" variant="outline" onClick={applyBulkDiscount}><Percent className="h-3.5 w-3.5" /></Button>
               </div>
             </div>
@@ -242,10 +265,8 @@ function Page() {
                 <Trash2 className="mr-1 h-4 w-4" /> Sil
               </Button>
             )}
-            <div className="ml-auto text-xs text-muted-foreground">
-              Kur: 1 USD ≈ {rates.USD.toFixed(2)} ₺ · 1 EUR ≈ {rates.EUR.toFixed(2)} ₺
-            </div>
           </div>
+
 
           {/* Ürün tablosu */}
           <div className="mt-4 overflow-x-auto">
