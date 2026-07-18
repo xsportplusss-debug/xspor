@@ -6,36 +6,43 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { useCompany } from "@/lib/company";
 
 export const Route = createFileRoute("/firma-ayarlari")({
   head: () => ({
     meta: [
       { title: "Firma Ayarları — Fintra" },
-      { name: "description", content: "Firma bilgileri, vergi dairesi ve tercihleri." },
+      { name: "description", content: "Firma bilgileri, iletişim ve tercihler." },
     ],
   }),
   component: Page,
 });
 
 function Page() {
+  const c = useCompany();
   return (
     <div className="space-y-6">
-      <PageHeader title="Firma Ayarları" subtitle="Firma bilgileri ve tercihler." />
+      <PageHeader title="Firma Ayarları" subtitle="Fiyat teklifi ve belgelerde bu bilgiler kullanılır." />
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="glass">
           <CardHeader><CardTitle className="text-base">Firma Bilgileri</CardTitle></CardHeader>
           <CardContent className="grid gap-4">
-            <div className="grid gap-2"><Label>Ünvan</Label><Input defaultValue="Fintra Yazılım A.Ş." /></div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div className="grid gap-2"><Label>Vergi Dairesi</Label><Input defaultValue="Büyük Mükellefler" /></div>
-              <div className="grid gap-2"><Label>Vergi No</Label><Input defaultValue="1234567890" /></div>
+            <div className="flex items-center gap-4">
+              {c.logoUrl && <img src={c.logoUrl} alt="logo" className="h-16 w-16 rounded-lg object-contain border bg-white p-1" />}
+              <div className="flex-1 grid gap-2"><Label>Logo URL</Label><Input value={c.logoUrl} onChange={(e) => c.set({ logoUrl: e.target.value })} /></div>
             </div>
-            <div className="grid gap-2"><Label>Adres</Label><Input defaultValue="Levent Mah. Büyükdere Cad. No:1, İstanbul" /></div>
+            <div className="grid gap-2"><Label>Ünvan</Label><Input value={c.name} onChange={(e) => c.set({ name: e.target.value })} /></div>
             <div className="grid gap-2 sm:grid-cols-2">
-              <div className="grid gap-2"><Label>Telefon</Label><Input defaultValue="0212 555 00 00" /></div>
-              <div className="grid gap-2"><Label>E-posta</Label><Input defaultValue="info@fintra.com" /></div>
+              <div className="grid gap-2"><Label>Vergi Dairesi</Label><Input value={c.taxOffice} onChange={(e) => c.set({ taxOffice: e.target.value })} /></div>
+              <div className="grid gap-2"><Label>Vergi No</Label><Input value={c.taxNo} onChange={(e) => c.set({ taxNo: e.target.value })} /></div>
             </div>
-            <Button onClick={() => toast.success("Firma bilgileri güncellendi")} className="gradient-primary text-primary-foreground shadow-elegant">Kaydet</Button>
+            <div className="grid gap-2"><Label>Adres</Label><Input value={c.address} onChange={(e) => c.set({ address: e.target.value })} /></div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-2"><Label>Telefon</Label><Input value={c.phone} onChange={(e) => c.set({ phone: e.target.value })} /></div>
+              <div className="grid gap-2"><Label>E-posta</Label><Input value={c.email} onChange={(e) => c.set({ email: e.target.value })} /></div>
+            </div>
+            <div className="grid gap-2"><Label>Web</Label><Input value={c.web} onChange={(e) => c.set({ web: e.target.value })} /></div>
+            <Button onClick={() => toast.success("Firma bilgileri kaydedildi")} className="gradient-primary text-primary-foreground shadow-elegant">Kaydet</Button>
           </CardContent>
         </Card>
 
