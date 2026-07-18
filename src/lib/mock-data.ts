@@ -2,13 +2,15 @@
 // dışa aktarır. Tüm koleksiyonlar `src/lib/store.ts` altında Zustand ile
 // yönetilir ve tarayıcıda `localStorage`'a kalıcılaştırılır.
 
+export type InvoiceStatus = "Onaylı" | "Taslak" | "İptal" | "Tahsil Edildi" | "Ödeme Bekleniyor";
+
 export type Invoice = {
   id: string;
   no: string;
   date: string;
   party: string;
-  status: "Onaylı" | "Taslak" | "İptal";
-  payment: "Tahsil Edildi" | "Kısmi" | "Bekliyor";
+  status: InvoiceStatus;
+  payment?: "Tahsil Edildi" | "Kısmi" | "Bekliyor";
   total: number;
   subtotal?: number;
   vat?: number;
@@ -33,6 +35,9 @@ export type Product = {
   name: string;
   category: string;
   brand: string;
+  image?: string;
+  price1: number;
+  tax: number;
   buy: number;
   sell: number;
   vat: number;
