@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
@@ -41,8 +41,7 @@ const emptyForm = (prefix: string): Omit<Invoice, "id"> => ({
   vat: 0,
   discount: 0,
   total: 0,
-  status: "Onaylı",
-  payment: "Bekliyor",
+  status: "Ödeme Bekleniyor",
 });
 
 export function InvoiceListView({
