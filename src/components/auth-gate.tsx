@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
-type Status = "loading" | "auth" | "hydrating" | "ready";
+type Status = "loading" | "auth" | "hydrating" | "unauthorized" | "ready";
+
+const ALLOWED_EMAIL = "xsportplusss@gmail.com";
 
 let syncInitialized = false;
 
@@ -17,7 +19,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    const handleSession = async (userId: string) => {
+    const handleSession = async (userId: string, email: string | undefined) => {
+      if ((email ?? "").toLowerCase() !== ALLOWED_EMAIL) {
+        if (!cancelled) setStatus("unauthorized");
+        return;
+      }
       setStatus("hydrating");
       await loadFromCloud(userId);
       if (!syncInitialized) {
@@ -29,12 +35,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return;
-      if (data.session) handleSession(data.session.user.id);
+      if (data.session) handleSession(data.session.user.id, data.session.user.email);
       else setStatus("auth");
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" && session) handleSession(session.user.id);
+      if (event === "SIGNED_IN" && session) handleSession(session.user.id, session.user.email);
       if (event === "SIGNED_OUT") {
         stopSync();
         setStatus("auth");
@@ -58,9 +64,37 @@ export function AuthGate({ children }: { children: ReactNode }) {
     );
   }
 
+  if (status === "unauthorized") return <UnauthorizedScreen />;
   if (status === "auth") return <AuthScreen />;
   return <>{children}</>;
 }
+
+function UnauthorizedScreen() {
+  const [busy, setBusy] = useState(false);
+  const signOut = async () => {
+    setBusy(true);
+    await supabase.auth.signOut();
+    setBusy(false);
+  };
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-muted p-4">
+      <Card className="w-full max-w-md glass shadow-elegant">
+        <CardHeader>
+          <CardTitle className="text-center text-xl">Yetkisiz Erişim</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-center text-sm text-muted-foreground">
+            Bu uygulamaya yalnızca yetkili hesap erişebilir. Lütfen doğru Google hesabıyla giriş yapın.
+          </p>
+          <Button onClick={signOut} disabled={busy} className="w-full">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Çıkış Yap"}
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 
 function AuthScreen() {
   const [busy, setBusy] = useState(false);
