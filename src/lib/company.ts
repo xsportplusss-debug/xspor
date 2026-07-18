@@ -18,7 +18,7 @@ export type Company = {
 
 const defaults: Company = {
   name: "XSPORTPLUS",
-  tagline: "Outdoor & Tactical Kamp Malzemeleri",
+  tagline: "Outdoor & Taktik Kamp Malzemeleri",
   owner: "Bayram Koçer",
   taxOffice: "KÜÇÜKKÖY",
   taxNo: "5730628635",
