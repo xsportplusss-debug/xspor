@@ -14,18 +14,19 @@ export const Route = createFileRoute("/alis-faturalari")({
 
 function Page() {
   const list = useStore((s) => s.purchaseInvoices);
-  const add = useStore((s) => s.addPurchase);
-  const bulkAdd = useStore((s) => s.bulkAddPurchase);
-  const update = useStore((s) => s.updatePurchase);
-  const remove = useStore((s) => s.removePurchase);
-  const bulkRemove = useStore((s) => s.bulkRemovePurchase);
   return (
     <InvoiceListView
       title="Alış Faturaları"
       partyLabel="Tedarikçi"
       newPrefix="AF"
+      kind="purchase"
       list={list}
-      add={add} bulkAdd={bulkAdd} update={update} remove={remove} bulkRemove={bulkRemove}
+      add={useStore((s) => s.addPurchase)}
+      bulkAdd={useStore((s) => s.bulkAddPurchase)}
+      update={useStore((s) => s.updatePurchase)}
+      bulkUpdate={useStore((s) => s.bulkUpdatePurchase)}
+      remove={useStore((s) => s.removePurchase)}
+      bulkRemove={useStore((s) => s.bulkRemovePurchase)}
     />
   );
 }

@@ -14,18 +14,19 @@ export const Route = createFileRoute("/satis-faturalari")({
 
 function Page() {
   const list = useStore((s) => s.salesInvoices);
-  const add = useStore((s) => s.addSales);
-  const bulkAdd = useStore((s) => s.bulkAddSales);
-  const update = useStore((s) => s.updateSales);
-  const remove = useStore((s) => s.removeSales);
-  const bulkRemove = useStore((s) => s.bulkRemoveSales);
   return (
     <InvoiceListView
       title="Satış Faturaları"
       partyLabel="Müşteri"
       newPrefix="SF"
+      kind="sales"
       list={list}
-      add={add} bulkAdd={bulkAdd} update={update} remove={remove} bulkRemove={bulkRemove}
+      add={useStore((s) => s.addSales)}
+      bulkAdd={useStore((s) => s.bulkAddSales)}
+      update={useStore((s) => s.updateSales)}
+      bulkUpdate={useStore((s) => s.bulkUpdateSales)}
+      remove={useStore((s) => s.removeSales)}
+      bulkRemove={useStore((s) => s.bulkRemoveSales)}
     />
   );
 }
