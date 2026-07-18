@@ -199,3 +199,10 @@
 @utility gradient-primary {
   background: var(--gradient-primary);
 }
+
+@media print {
+  aside[data-sidebar], [data-sidebar="sidebar"], header { display: none !important; }
+  main, body, html { background: white !important; }
+  .glass { background: white !important; box-shadow: none !important; backdrop-filter: none !important; }
+  @page { size: A4; margin: 12mm; }
+}
