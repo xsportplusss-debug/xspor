@@ -170,7 +170,13 @@ export function InvoiceListView({
                       <TableCell className="text-right">{s.discount ? fmtTL(s.discount) : "—"}</TableCell>
                       <TableCell className="text-right font-semibold">{fmtTL(s.total)}</TableCell>
                       <TableCell>
-                        <Badge variant={s.status === "Onaylı" ? "default" : s.status === "Taslak" ? "secondary" : "destructive"}>{s.status}</Badge>
+                        <Badge variant={
+                          s.status === "Tahsil Edildi" ? "default"
+                          : s.status === "Ödeme Bekleniyor" ? "secondary"
+                          : s.status === "Onaylı" ? "default"
+                          : s.status === "Taslak" ? "secondary"
+                          : "destructive"
+                        }>{s.status}</Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
@@ -185,6 +191,24 @@ export function InvoiceListView({
                     </TableRow>
                   ))}
                 </TableBody>
+                {filtered.length > 0 && (() => {
+                  const sub = filtered.reduce((a, x) => a + (x.subtotal ?? 0), 0);
+                  const vat = filtered.reduce((a, x) => a + (x.vat ?? 0), 0);
+                  const disc = filtered.reduce((a, x) => a + (x.discount ?? 0), 0);
+                  const tot = filtered.reduce((a, x) => a + x.total, 0);
+                  return (
+                    <TableFooter>
+                      <TableRow className="bg-muted/40 font-semibold">
+                        <TableCell colSpan={4} className="text-right">TOPLAM ({filtered.length} kayıt)</TableCell>
+                        <TableCell className="text-right">{fmtTL(sub)}</TableCell>
+                        <TableCell className="text-right">{fmtTL(vat)}</TableCell>
+                        <TableCell className="text-right">{fmtTL(disc)}</TableCell>
+                        <TableCell className="text-right text-primary">{fmtTL(tot)}</TableCell>
+                        <TableCell colSpan={2}></TableCell>
+                      </TableRow>
+                    </TableFooter>
+                  );
+                })()}
               </Table>
             </div>
           </CardContent>
@@ -254,23 +278,14 @@ function InvoiceForm({
           <Select value={value.status} onValueChange={(v) => set({ status: v as any })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
+              <SelectItem value="Ödeme Bekleniyor">Ödeme Bekleniyor</SelectItem>
+              <SelectItem value="Tahsil Edildi">Tahsil Edildi</SelectItem>
               <SelectItem value="Onaylı">Onaylı</SelectItem>
               <SelectItem value="Taslak">Taslak</SelectItem>
               <SelectItem value="İptal">İptal</SelectItem>
             </SelectContent>
           </Select>
         </div>
-      </div>
-      <div>
-        <Label>Tahsilat</Label>
-        <Select value={value.payment} onValueChange={(v) => set({ payment: v as any })}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Bekliyor">Bekliyor</SelectItem>
-            <SelectItem value="Kısmi">Kısmi</SelectItem>
-            <SelectItem value="Tahsil Edildi">Tahsil Edildi</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
     </div>
   );
