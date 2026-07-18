@@ -1,16 +1,15 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable";
 import { loadFromCloud, initAutoSync, stopSync } from "@/lib/cloud-sync";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, LogOut } from "lucide-react";
 
-type Status = "loading" | "auth" | "hydrating" | "ready";
+type Status = "loading" | "auth" | "hydrating" | "ready" | "forbidden";
 
+const ALLOWED_EMAIL = "xsportplusss@gmail.com";
 let syncInitialized = false;
 
 export function AuthGate({ children }: { children: ReactNode }) {
@@ -19,7 +18,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    const hydrate = async (userId: string) => {
+    const handleSession = async (userId: string, email?: string | null) => {
+      if ((email ?? "").toLowerCase() !== ALLOWED_EMAIL) {
+        if (!cancelled) setStatus("forbidden");
+        return;
+      }
       setStatus("hydrating");
       await loadFromCloud(userId);
       if (!syncInitialized) {
@@ -31,12 +34,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return;
-      if (data.session) hydrate(data.session.user.id);
+      if (data.session) handleSession(data.session.user.id, data.session.user.email);
       else setStatus("auth");
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" && session) hydrate(session.user.id);
+      if (event === "SIGNED_IN" && session) handleSession(session.user.id, session.user.email);
       if (event === "SIGNED_OUT") {
         stopSync();
         setStatus("auth");
@@ -60,86 +63,82 @@ export function AuthGate({ children }: { children: ReactNode }) {
     );
   }
 
+  if (status === "forbidden") return <ForbiddenScreen />;
   if (status === "auth") return <AuthScreen />;
-
   return <>{children}</>;
 }
 
 function AuthScreen() {
-  const [tab, setTab] = useState("signin");
+  const [busy, setBusy] = useState(false);
+
+  const signIn = async () => {
+    setBusy(true);
+    const result = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: window.location.origin,
+    });
+    if (result?.error) {
+      setBusy(false);
+      toast.error(result.error.message ?? "Giriş başarısız");
+    }
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-muted p-4">
       <Card className="w-full max-w-md glass shadow-elegant">
         <CardHeader>
           <CardTitle className="text-center text-2xl">Fintra</CardTitle>
           <p className="text-center text-sm text-muted-foreground">
-            Verileriniz tüm cihazlarınızda güncel kalır
+            Google hesabınızla giriş yapın
           </p>
         </CardHeader>
-        <CardContent>
-          <Tabs value={tab} onValueChange={setTab}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="signin">Giriş Yap</TabsTrigger>
-              <TabsTrigger value="signup">Kayıt Ol</TabsTrigger>
-            </TabsList>
-            <TabsContent value="signin"><SignInForm /></TabsContent>
-            <TabsContent value="signup"><SignUpForm /></TabsContent>
-          </Tabs>
+        <CardContent className="space-y-4 pt-2">
+          <Button onClick={signIn} disabled={busy} className="w-full" variant="outline">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : (
+              <>
+                <GoogleIcon /> <span className="ml-2">Google ile Giriş Yap</span>
+              </>
+            )}
+          </Button>
+          <p className="text-center text-xs text-muted-foreground">
+            Yalnızca yetkili hesap erişebilir.
+          </p>
         </CardContent>
       </Card>
     </div>
   );
 }
 
-function SignInForm() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setBusy(false);
-    if (error) toast.error(error.message);
+function ForbiddenScreen() {
+  const signOut = async () => {
+    await supabase.auth.signOut();
   };
-
   return (
-    <form onSubmit={submit} className="space-y-3 pt-4">
-      <div><Label>E-posta</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
-      <div><Label>Şifre</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required /></div>
-      <Button type="submit" disabled={busy} className="w-full gradient-primary text-primary-foreground">
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Giriş Yap"}
-      </Button>
-    </form>
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-muted p-4">
+      <Card className="w-full max-w-md glass shadow-elegant">
+        <CardHeader>
+          <CardTitle className="text-center text-xl">Yetkisiz Erişim</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-center text-sm text-muted-foreground">
+            Bu hesap Fintra verilerine erişim yetkisine sahip değil. Lütfen yetkili
+            Google hesabıyla giriş yapın.
+          </p>
+          <Button onClick={signOut} variant="outline" className="w-full">
+            <LogOut className="mr-2 h-4 w-4" /> Çıkış Yap
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
-function SignUpForm() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo: window.location.origin },
-    });
-    setBusy(false);
-    if (error) return toast.error(error.message);
-    toast.success("Hesap oluşturuldu. Giriş yapabilirsiniz.");
-  };
-
+function GoogleIcon() {
   return (
-    <form onSubmit={submit} className="space-y-3 pt-4">
-      <div><Label>E-posta</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
-      <div><Label>Şifre (en az 6 karakter)</Label><Input type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} required /></div>
-      <Button type="submit" disabled={busy} className="w-full gradient-primary text-primary-foreground">
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Kayıt Ol"}
-      </Button>
-    </form>
+    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+      <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.4 29.3 35.5 24 35.5c-6.4 0-11.5-5.1-11.5-11.5S17.6 12.5 24 12.5c2.9 0 5.6 1.1 7.6 2.9l5.7-5.7C33.9 6.4 29.2 4.5 24 4.5 13.2 4.5 4.5 13.2 4.5 24S13.2 43.5 24 43.5 43.5 34.8 43.5 24c0-1.2-.1-2.4-.4-3.5z"/>
+      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.9 19 12.5 24 12.5c2.9 0 5.6 1.1 7.6 2.9l5.7-5.7C33.9 6.4 29.2 4.5 24 4.5 16.3 4.5 9.7 8.9 6.3 14.7z"/>
+      <path fill="#4CAF50" d="M24 43.5c5.1 0 9.8-1.9 13.3-5.1l-6.1-5.2c-2 1.4-4.5 2.3-7.2 2.3-5.3 0-9.7-3.1-11.3-7.5l-6.5 5C9.6 39 16.2 43.5 24 43.5z"/>
+      <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.1 5.6l6.1 5.2c-.4.4 6.7-4.9 6.7-14.8 0-1.2-.1-2.4-.4-3.5z"/>
+    </svg>
   );
 }
