@@ -33,6 +33,7 @@ import { Route as PazaryerleriHepsiburadaRouteImport } from './routes/pazaryerle
 import { Route as PazaryerleriAmazonRouteImport } from './routes/pazaryerleri.amazon'
 import { Route as KasaIdRouteImport } from './routes/kasa.$id'
 import { Route as BankalarIdRouteImport } from './routes/bankalar.$id'
+import { Route as ApiPublicHooksDriveBackupRouteImport } from './routes/api/public/hooks/drive-backup'
 
 const UrunlerRoute = UrunlerRouteImport.update({
   id: '/urunler',
@@ -154,6 +155,12 @@ const BankalarIdRoute = BankalarIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => BankalarRoute,
 } as any)
+const ApiPublicHooksDriveBackupRoute =
+  ApiPublicHooksDriveBackupRouteImport.update({
+    id: '/api/public/hooks/drive-backup',
+    path: '/api/public/hooks/drive-backup',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -180,6 +187,7 @@ export interface FileRoutesByFullPath {
   '/pazaryerleri/n11': typeof PazaryerleriN11Route
   '/pazaryerleri/pazarama': typeof PazaryerleriPazaramaRoute
   '/pazaryerleri/trendyol': typeof PazaryerleriTrendyolRoute
+  '/api/public/hooks/drive-backup': typeof ApiPublicHooksDriveBackupRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -206,6 +214,7 @@ export interface FileRoutesByTo {
   '/pazaryerleri/n11': typeof PazaryerleriN11Route
   '/pazaryerleri/pazarama': typeof PazaryerleriPazaramaRoute
   '/pazaryerleri/trendyol': typeof PazaryerleriTrendyolRoute
+  '/api/public/hooks/drive-backup': typeof ApiPublicHooksDriveBackupRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -233,6 +242,7 @@ export interface FileRoutesById {
   '/pazaryerleri/n11': typeof PazaryerleriN11Route
   '/pazaryerleri/pazarama': typeof PazaryerleriPazaramaRoute
   '/pazaryerleri/trendyol': typeof PazaryerleriTrendyolRoute
+  '/api/public/hooks/drive-backup': typeof ApiPublicHooksDriveBackupRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -261,6 +271,7 @@ export interface FileRouteTypes {
     | '/pazaryerleri/n11'
     | '/pazaryerleri/pazarama'
     | '/pazaryerleri/trendyol'
+    | '/api/public/hooks/drive-backup'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -287,6 +298,7 @@ export interface FileRouteTypes {
     | '/pazaryerleri/n11'
     | '/pazaryerleri/pazarama'
     | '/pazaryerleri/trendyol'
+    | '/api/public/hooks/drive-backup'
   id:
     | '__root__'
     | '/'
@@ -313,6 +325,7 @@ export interface FileRouteTypes {
     | '/pazaryerleri/n11'
     | '/pazaryerleri/pazarama'
     | '/pazaryerleri/trendyol'
+    | '/api/public/hooks/drive-backup'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -338,6 +351,7 @@ export interface RootRouteChildren {
   PazaryerleriN11Route: typeof PazaryerleriN11Route
   PazaryerleriPazaramaRoute: typeof PazaryerleriPazaramaRoute
   PazaryerleriTrendyolRoute: typeof PazaryerleriTrendyolRoute
+  ApiPublicHooksDriveBackupRoute: typeof ApiPublicHooksDriveBackupRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -510,6 +524,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BankalarIdRouteImport
       parentRoute: typeof BankalarRoute
     }
+    '/api/public/hooks/drive-backup': {
+      id: '/api/public/hooks/drive-backup'
+      path: '/api/public/hooks/drive-backup'
+      fullPath: '/api/public/hooks/drive-backup'
+      preLoaderRoute: typeof ApiPublicHooksDriveBackupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -558,6 +579,7 @@ const rootRouteChildren: RootRouteChildren = {
   PazaryerleriN11Route: PazaryerleriN11Route,
   PazaryerleriPazaramaRoute: PazaryerleriPazaramaRoute,
   PazaryerleriTrendyolRoute: PazaryerleriTrendyolRoute,
+  ApiPublicHooksDriveBackupRoute: ApiPublicHooksDriveBackupRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
