@@ -221,5 +221,5 @@ export const INVOICE_TEMPLATE_HEADERS = [
 ];
 
 export const PRODUCT_TEMPLATE_HEADERS = [
-  "picture1Path", "label", "brand", "stockCode", "barcode", "mainCategory", "price1", "tax",
+  "picture1Path", "label", "brand", "stockCode", "barcode", "mainCategory", "price1", "currency", "tax",
 ];
