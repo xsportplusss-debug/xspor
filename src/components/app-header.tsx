@@ -1,4 +1,4 @@
-import { Bell, Moon, Search, Sun, LogOut, Building2, Settings, User } from "lucide-react";
+import { Bell, Moon, Search, Sun, LogOut, Building2, Settings } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
