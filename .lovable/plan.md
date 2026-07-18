@@ -1,74 +1,39 @@
 
-# Fintra — Fonksiyonel Güncellemeler + Boş Başlangıç
+# Bulut Senkron Planı
 
-Frontend-only kalır. **Tüm örnek (mock) veriler silinir** — panel tamamen boş açılır. Kullanıcı ekledikçe / import ettikçe dolar. Kalıcılık için `localStorage`.
+Tüm verileri Lovable Cloud'a taşıyıp e-posta/şifre girişi ile korumak. Böylece hangi cihazdan girerseniz girin aynı veriyi görürsünüz.
 
-## 1. Global veri katmanı
-- `src/lib/store.ts` — Zustand + persist. Tüm koleksiyonlar `[]` başlar:
-  `salesInvoices`, `purchaseInvoices`, `cariList`, `products`, `categories`,
-  `banks`, `bankTx`, `cashRegisters`, `cashTx`.
-- Her koleksiyon için `add`, `update`, `remove`, `bulkAdd`.
-- `deriveIncomeExpense()` banka + kasa hareketlerinden gelir/gider özeti üretir.
-- `src/lib/mock-data.ts` içindeki örnek diziler kaldırılır; sadece `fmt`, `fmtTL` gibi yardımcılar `src/lib/format.ts`'e taşınır.
-- Dashboard/Raporlar dahil tüm sayfalar store'dan okur; veri yoksa **empty state** kartı gösterilir ("Henüz kayıt yok — ekleyin veya içe aktarın").
+## 1. Altyapı
+- **Lovable Cloud etkinleştir** (Supabase tabanlı — sizden ek hesap istemez).
+- E-posta + şifre girişi (`/auth` sayfası — kayıt + giriş + çıkış). "Tek kullanıcı" tercihiniz gereği yeni kayıtları kapatma seçeneği: ilk kayıttan sonra kayıt formu gizlenir; sadece siz girersiniz.
+- `_authenticated` layout (mevcut şablon otomatik gelir) — tüm sayfalar giriş gerektirir.
 
-## 2. İçe aktarma altyapısı
-- `bun add xlsx pdfjs-dist`
-- `src/lib/importers.ts`: `parseExcel`, `parsePdfTable`, `parseProductXml` (URL veya yapıştırılan XML).
-- Ortak `ImportDialog`: dosya seç → önizleme tablosu → alan eşleme → içe aktar.
+## 2. Veritabanı tabloları (her tabloda `user_id` + RLS "sadece kendi verin")
+- `sales_invoices`, `purchase_invoices`
+- `cari` (müşteriler)
+- `products`, `categories`
+- `banks`, `bank_tx`
+- `cash_registers`, `cash_tx`
+- `company_settings` (firma bilgileri + logo)
+- `quotes` (fiyat teklifleri — kaydet/önizle özelliği için)
 
-## 3. Sayfa değişiklikleri
+## 3. Kod tarafı
+- Mevcut Zustand store'u **server function**'lara çevrilecek — her CRUD Supabase'e yazar, TanStack Query ile cache/invalidate.
+- **Otomatik migrasyon**: giriş yapınca `localStorage`'daki `fintra:v1` verisi bulutta boşsa tek seferlik yüklenir, sonra flag ile devre dışı.
+- Firma logosu Cloud Storage'a yüklenir → URL DB'de saklanır.
+- Fiyat Teklifi: "Kaydet" ve "Önizleme" butonları — kayıtlı teklifleri listeden açıp düzenleyebilirsiniz.
 
-### Satış / Alış Faturaları
-- Satırda **Sil** (onaylı).
-- Toolbar: **Excel İçe Aktar**, **PDF İçe Aktar** (her ikisinde).
+## 4. Kapsam
+- ✅ Tüm liste sayfaları (faturalar, cari, ürünler, bankalar, kasa, teklifler) buluttan okuyacak.
+- ✅ Excel/PDF/XML import bulut kayıtları oluşturacak.
+- ✅ Telefon + masaüstü aynı anda güncel — bir cihazda ekleyince diğerinde 1-2 sn'de görünür.
+- ❌ Gerçek zamanlı (websocket) push kapsam dışı — sayfa yenilendiğinde/route değişince güncel; istersen ekleriz.
+- ❌ xsportplus.com.tr'ye gömme (iframe/subdomain) ayrı bir iş — panel kendi URL'sinde kalır.
 
-### Cari Hesaplar
-- **Yeni Cari** dialogu, satırda **Sil**.
+## Teknik notlar
+- Auth: Supabase Auth (email+password).
+- Data API: TanStack `createServerFn` + `requireSupabaseAuth`; RLS `auth.uid() = user_id`.
+- Cache: TanStack Query, mutation sonrası `invalidateQueries`.
+- Şema değişikliği migration'ları Lovable Cloud üzerinden.
 
-### Tedarikçiler
-- Rota (`tedarikciler.tsx`) ve sidebar öğesi silinir.
-
-### Ürünler
-- **XML İçe Aktar** dialogu (URL veya yapıştırılan XML) → etiket eşleme: ürün adı, stok kodu, barkod, kategori. Kategori/resim import'a dahil edilmez, sadece ad/stok kodu/barkod alınır; kategori bağlantısı XML'den kurulur.
-- Manuel **Yeni Ürün**, satırda **Sil**.
-
-### Kategoriler
-- XML import edilen kategoriler otomatik eklenir.
-- Kategori kartına tıkla → o kategorideki ürünleri listeleyen drawer.
-
-### Stok Hareketleri
-- Rota + sidebar öğesi silinir.
-
-### Bankalar
-- **Yeni Hesap** dialogu (ad, IBAN, para birimi, açılış bakiyesi, renk).
-- Karta tıkla → `/bankalar/$id`:
-  - Hareket tablosu (tarih, açıklama, giriş, çıkış, bakiye)
-  - **Yeni Hareket** (manuel), satırda **Düzenle/Sil**
-  - **Excel/PDF İçe Aktar** (ekstre)
-
-### Kasa
-- Kartta son hareketler + "Tümü" linki.
-- **Giriş / Çıkış / Düzeltme** dialogları.
-- `/kasa/$id`: tam hareket tablosu, düzenle/sil.
-
-### Gelirler / Giderler
-- `bankTx` + `cashTx`'ten `type = income|expense` olarak ayrıştırılır.
-- Özet kartları (toplam gelir, gider, net) + kaynak/tarih/kategori filtresi + birleşik tablo.
-- Sadece okuma — kayıtlar banka/kasa sayfalarından girilir (tek gerçek kaynak).
-
-### Dashboard & Raporlar
-- Tüm grafikler store'dan türetilir. Veri yoksa empty state.
-
-## 4. Teknik notlar
-- `pdfjs-dist` worker: `?url` import ile Vite'a bağlanır.
-- XML parse tarayıcıda `DOMParser`. CORS olursa yapıştırma alternatifi.
-- Zustand persist key: `fintra:v1`, şema değişirse `version` bump.
-- Rota silindiğinde `routeTree.gen.ts` otomatik regenerate.
-
-## 5. Kapsam dışı
-- Backend / senkron
-- Fatura PDF export (yalnız import)
-- Kullanıcı yetkilendirme
-
-Onaylarsan uygulamaya başlıyorum.
+Onaylarsan Lovable Cloud'u açıp inşaya başlıyorum.

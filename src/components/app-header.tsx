@@ -1,4 +1,4 @@
-import { Bell, Moon, Search, Sun, LogOut, Building2, Settings, User } from "lucide-react";
+import { Bell, Moon, Search, Sun, LogOut, Building2, Settings } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,9 +13,17 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from "react";
 
 export function AppHeader() {
   const { theme, toggle } = useTheme();
+  const [email, setEmail] = useState<string>("");
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? ""));
+  }, []);
+  const initials = (email.split("@")[0] || "?").slice(0, 2).toUpperCase();
+  const signOut = async () => { await supabase.auth.signOut(); };
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b bg-background/80 px-3 backdrop-blur-xl sm:px-4">
@@ -40,25 +48,23 @@ export function AppHeader() {
             <Button variant="ghost" className="h-9 gap-2 pl-1.5 pr-2">
               <Avatar className="h-7 w-7">
                 <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-                  AY
+                  {initials}
                 </AvatarFallback>
               </Avatar>
               <div className="hidden text-left sm:block">
-                <div className="text-xs font-semibold leading-tight">Ahmet Yılmaz</div>
-                <div className="text-[10px] text-muted-foreground leading-tight">Yönetici</div>
+                <div className="text-xs font-semibold leading-tight max-w-[160px] truncate">{email || "Kullanıcı"}</div>
+                <div className="text-[10px] text-muted-foreground leading-tight">Bulut senkron aktif</div>
               </div>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
               <div className="flex items-center gap-2">
-                <span>Ahmet Yılmaz</span>
-                <Badge variant="secondary" className="text-[10px]">Pro</Badge>
+                <span className="truncate">{email || "Kullanıcı"}</span>
+                <Badge variant="secondary" className="text-[10px]">Cloud</Badge>
               </div>
-              <div className="text-xs font-normal text-muted-foreground">ahmet@firma.com</div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem><User className="mr-2 h-4 w-4" /> Profil</DropdownMenuItem>
             <DropdownMenuItem><Building2 className="mr-2 h-4 w-4" /> Firma Bilgileri</DropdownMenuItem>
             <DropdownMenuItem><Settings className="mr-2 h-4 w-4" /> Ayarlar</DropdownMenuItem>
             <DropdownMenuItem onClick={toggle}>
@@ -66,7 +72,7 @@ export function AppHeader() {
               Tema Değiştir
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive"><LogOut className="mr-2 h-4 w-4" /> Çıkış</DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive" onClick={signOut}><LogOut className="mr-2 h-4 w-4" /> Çıkış</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

@@ -16,6 +16,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { AppHeader } from "@/components/app-header";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { AuthGate } from "@/components/auth-gate";
 
 function NotFoundComponent() {
   return (
@@ -137,16 +138,18 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <SidebarProvider>
-          <AppSidebar />
-          <SidebarInset className="min-w-0">
-            <AppHeader />
-            <main className="flex-1 space-y-6 p-4 sm:p-6">
-              <Outlet />
-            </main>
-          </SidebarInset>
-          <Toaster richColors position="top-right" />
-        </SidebarProvider>
+        <AuthGate>
+          <SidebarProvider>
+            <AppSidebar />
+            <SidebarInset className="min-w-0">
+              <AppHeader />
+              <main className="flex-1 space-y-6 p-4 sm:p-6">
+                <Outlet />
+              </main>
+            </SidebarInset>
+          </SidebarProvider>
+        </AuthGate>
+        <Toaster richColors position="top-right" />
       </ThemeProvider>
     </QueryClientProvider>
   );
