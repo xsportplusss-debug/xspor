@@ -16,6 +16,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { AppHeader } from "@/components/app-header";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { AuthGate } from "@/components/auth-gate";
 
 function NotFoundComponent() {
   return (
