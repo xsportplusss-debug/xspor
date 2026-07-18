@@ -44,8 +44,8 @@ async function push() {
   try {
     const payload = {
       user_id: currentUserId,
-      data: snapshotData(),
-      company: snapshotCompany(),
+      data: snapshotData() as never,
+      company: snapshotCompany() as never,
       updated_at: new Date().toISOString(),
     };
     await supabase.from("user_data").upsert(payload, { onConflict: "user_id" });
