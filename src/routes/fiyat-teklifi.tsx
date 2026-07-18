@@ -11,10 +11,10 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { ImageOff, Percent, Plus, Printer, Search, Trash2 } from "lucide-react";
-import { fmtTL, type Product } from "@/lib/mock-data";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { fmtTL, type Product, type Currency } from "@/lib/mock-data";
 import { useStore } from "@/lib/store";
 import { useCompany } from "@/lib/company";
-import { useFxRates, toTRY } from "@/lib/fx";
 import { EmptyState } from "@/components/empty-state";
 import { toast } from "sonner";
 
@@ -35,10 +35,11 @@ type Line = {
   name: string;
   brand: string;
   sku: string;
-  priceTRY: number;   // KDV hariç, TL karşılığı (kurdan hesaplanmış)
-  tax: number;        // KDV %
+  price1: number;      // ürünün orijinal fiyatı (currency cinsinden, KDV hariç)
+  currency: Currency;  // ürünün para birimi
+  tax: number;         // KDV %
   qty: number;
-  markup: number;     // % — arka planda, çıktıda görünmez
+  markup: number;      // % — arka planda, çıktıda görünmez
 };
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -47,7 +48,10 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 function Page() {
   const company = useCompany();
   const products = useStore((s) => s.products);
-  const { rates } = useFxRates();
+
+  // Manuel kur — teklifin döviz cinsi ve ona ait kur (TL karşılığı).
+  const [docCurrency, setDocCurrency] = useState<Currency>("USD");
+  const [manualRate, setManualRate] = useState<number>(40); // 1 birim = ? TL
 
   const [quoteNo, setQuoteNo] = useState(`TKL-${Date.now().toString().slice(-6)}`);
   const [date, setDate] = useState(todayISO());
@@ -64,23 +68,19 @@ function Page() {
     setLines((ls) => [
       ...ls,
       {
-        id: uid(),
-        productId: p.id,
-        image: p.image,
-        name: p.name,
-        brand: p.brand,
-        sku: p.sku,
-        priceTRY: toTRY(p.price1, p.currency, rates),
-        tax: p.tax || 20,
-        qty: 1,
-        markup: 0,
+        id: uid(), productId: p.id, image: p.image,
+        name: p.name, brand: p.brand, sku: p.sku,
+        price1: p.price1, currency: p.currency,
+        tax: p.tax || 20, qty: 1, markup: 0,
       },
     ]);
   }
 
   const rows = useMemo(() => {
     return lines.map((l) => {
-      const unit = l.priceTRY * (1 + l.markup / 100);
+      // Formül: price1 (KDV hariç) × (markup) × (currency==TRY ? 1 : manualRate)
+      const rate = l.currency === "TRY" ? 1 : manualRate;
+      const unit = l.price1 * (1 + l.markup / 100) * rate;
       const gross = unit * l.qty;
       const disc = gross * (globalDiscount / 100);
       const net = gross - disc;
@@ -88,7 +88,7 @@ function Page() {
       const total = net + vat;
       return { ...l, unit, gross, disc, net, vat, total };
     });
-  }, [lines, globalDiscount]);
+  }, [lines, globalDiscount, manualRate]);
 
   const sums = rows.reduce(
     (a, r) => ({ net: a.net + r.net, vat: a.vat + r.vat, total: a.total + r.total, disc: a.disc + r.disc }),
