@@ -33,6 +33,10 @@ function Page() {
             </div>
             <div className="grid gap-2"><Label>Ünvan</Label><Input value={c.name} onChange={(e) => c.set({ name: e.target.value })} /></div>
             <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-2"><Label>Slogan / Faaliyet</Label><Input value={c.tagline} onChange={(e) => c.set({ tagline: e.target.value })} /></div>
+              <div className="grid gap-2"><Label>Yetkili / Sahibi</Label><Input value={c.owner} onChange={(e) => c.set({ owner: e.target.value })} /></div>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
               <div className="grid gap-2"><Label>Vergi Dairesi</Label><Input value={c.taxOffice} onChange={(e) => c.set({ taxOffice: e.target.value })} /></div>
               <div className="grid gap-2"><Label>Vergi No</Label><Input value={c.taxNo} onChange={(e) => c.set({ taxNo: e.target.value })} /></div>
             </div>
@@ -41,7 +45,10 @@ function Page() {
               <div className="grid gap-2"><Label>Telefon</Label><Input value={c.phone} onChange={(e) => c.set({ phone: e.target.value })} /></div>
               <div className="grid gap-2"><Label>E-posta</Label><Input value={c.email} onChange={(e) => c.set({ email: e.target.value })} /></div>
             </div>
-            <div className="grid gap-2"><Label>Web</Label><Input value={c.web} onChange={(e) => c.set({ web: e.target.value })} /></div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-2"><Label>Web</Label><Input value={c.web} onChange={(e) => c.set({ web: e.target.value })} /></div>
+              <div className="grid gap-2"><Label>KEP</Label><Input value={c.kep} onChange={(e) => c.set({ kep: e.target.value })} /></div>
+            </div>
             <Button onClick={() => toast.success("Firma bilgileri kaydedildi")} className="gradient-primary text-primary-foreground shadow-elegant">Kaydet</Button>
           </CardContent>
         </Card>
