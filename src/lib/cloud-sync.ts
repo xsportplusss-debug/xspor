@@ -87,8 +87,8 @@ export async function loadFromCloud(userId: string) {
       await supabase.from("user_data").upsert(
         {
           user_id: userId,
-          data: local,
-          company: snapshotCompany(),
+          data: local as never,
+          company: snapshotCompany() as never,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "user_id" },
