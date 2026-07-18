@@ -11,10 +11,10 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { ImageOff, Percent, Plus, Printer, Search, Trash2 } from "lucide-react";
-import { fmtTL, type Product } from "@/lib/mock-data";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { fmtTL, type Product, type Currency } from "@/lib/mock-data";
 import { useStore } from "@/lib/store";
 import { useCompany } from "@/lib/company";
-import { useFxRates, toTRY } from "@/lib/fx";
 import { EmptyState } from "@/components/empty-state";
 import { toast } from "sonner";
 
@@ -35,10 +35,11 @@ type Line = {
   name: string;
   brand: string;
   sku: string;
-  priceTRY: number;   // KDV hariç, TL karşılığı (kurdan hesaplanmış)
-  tax: number;        // KDV %
+  price1: number;      // ürünün orijinal fiyatı (currency cinsinden, KDV hariç)
+  currency: Currency;  // ürünün para birimi
+  tax: number;         // KDV %
   qty: number;
-  markup: number;     // % — arka planda, çıktıda görünmez
+  markup: number;      // % — arka planda, çıktıda görünmez
 };
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -47,7 +48,10 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 function Page() {
   const company = useCompany();
   const products = useStore((s) => s.products);
-  const { rates } = useFxRates();
+
+  // Manuel kur — teklifin döviz cinsi ve ona ait kur (TL karşılığı).
+  const [docCurrency, setDocCurrency] = useState<Currency>("USD");
+  const [manualRate, setManualRate] = useState<number>(40); // 1 birim = ? TL
 
   const [quoteNo, setQuoteNo] = useState(`TKL-${Date.now().toString().slice(-6)}`);
   const [date, setDate] = useState(todayISO());
@@ -64,23 +68,19 @@ function Page() {
     setLines((ls) => [
       ...ls,
       {
-        id: uid(),
-        productId: p.id,
-        image: p.image,
-        name: p.name,
-        brand: p.brand,
-        sku: p.sku,
-        priceTRY: toTRY(p.price1, p.currency, rates),
-        tax: p.tax || 20,
-        qty: 1,
-        markup: 0,
+        id: uid(), productId: p.id, image: p.image,
+        name: p.name, brand: p.brand, sku: p.sku,
+        price1: p.price1, currency: p.currency,
+        tax: p.tax || 20, qty: 1, markup: 0,
       },
     ]);
   }
 
   const rows = useMemo(() => {
     return lines.map((l) => {
-      const unit = l.priceTRY * (1 + l.markup / 100);
+      // Formül: price1 (KDV hariç) × (markup) × (currency==TRY ? 1 : manualRate)
+      const rate = l.currency === "TRY" ? 1 : manualRate;
+      const unit = l.price1 * (1 + l.markup / 100) * rate;
       const gross = unit * l.qty;
       const disc = gross * (globalDiscount / 100);
       const net = gross - disc;
@@ -88,7 +88,7 @@ function Page() {
       const total = net + vat;
       return { ...l, unit, gross, disc, net, vat, total };
     });
-  }, [lines, globalDiscount]);
+  }, [lines, globalDiscount, manualRate]);
 
   const sums = rows.reduce(
     (a, r) => ({ net: a.net + r.net, vat: a.vat + r.vat, total: a.total + r.total, disc: a.disc + r.disc }),
@@ -196,44 +196,67 @@ function Page() {
             </div>
           </div>
 
-          {/* Cari */}
-          <div className="mt-6 rounded-lg border bg-muted/20 p-4">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sayın</div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div><Label className="text-xs">Ünvan</Label>
-                <Input value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} className="border-0 border-b rounded-none bg-transparent px-0" />
+          {/* Cari — kompakt */}
+          <div className="mt-6 rounded-lg border bg-muted/20 p-3">
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Sayın</div>
+            <div className="grid gap-x-3 gap-y-2 md:grid-cols-4">
+              <div className="md:col-span-2">
+                <Label className="text-[11px]">Ünvan</Label>
+                <Input value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
+                  className="h-8 border-0 border-b rounded-none bg-transparent px-0 text-sm" />
               </div>
-              <div><Label className="text-xs">Vergi No / TCKN</Label>
-                <Input value={customer.taxNo} onChange={(e) => setCustomer({ ...customer, taxNo: e.target.value })} className="border-0 border-b rounded-none bg-transparent px-0" />
+              <div><Label className="text-[11px]">Vergi No / TCKN</Label>
+                <Input value={customer.taxNo} onChange={(e) => setCustomer({ ...customer, taxNo: e.target.value })}
+                  className="h-8 border-0 border-b rounded-none bg-transparent px-0 text-sm" />
               </div>
-              <div className="md:col-span-2"><Label className="text-xs">Adres</Label>
-                <Input value={customer.address} onChange={(e) => setCustomer({ ...customer, address: e.target.value })} className="border-0 border-b rounded-none bg-transparent px-0" />
+              <div><Label className="text-[11px]">Telefon</Label>
+                <Input value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
+                  className="h-8 border-0 border-b rounded-none bg-transparent px-0 text-sm" />
               </div>
-              <div><Label className="text-xs">Telefon</Label>
-                <Input value={customer.phone} onChange={(e) => setCustomer({ ...customer, phone: e.target.value })} className="border-0 border-b rounded-none bg-transparent px-0" />
+              <div className="md:col-span-3"><Label className="text-[11px]">Adres</Label>
+                <Input value={customer.address} onChange={(e) => setCustomer({ ...customer, address: e.target.value })}
+                  className="h-8 border-0 border-b rounded-none bg-transparent px-0 text-sm" />
               </div>
-              <div><Label className="text-xs">E-posta</Label>
-                <Input value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })} className="border-0 border-b rounded-none bg-transparent px-0" />
+              <div><Label className="text-[11px]">E-posta</Label>
+                <Input value={customer.email} onChange={(e) => setCustomer({ ...customer, email: e.target.value })}
+                  className="h-8 border-0 border-b rounded-none bg-transparent px-0 text-sm" />
               </div>
             </div>
           </div>
 
-          {/* Toplu araç barı — çıktıda gizli */}
-          <div className="mt-6 flex flex-wrap items-end gap-3 rounded-lg border bg-muted/10 p-3 print:hidden">
+          {/* Manuel kur + toplu araç — çıktıda gizli */}
+          <div className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border bg-muted/10 p-3 print:hidden">
+            <div>
+              <Label className="text-xs">Döviz</Label>
+              <Select value={docCurrency} onValueChange={(v) => setDocCurrency(v as Currency)}>
+                <SelectTrigger className="h-9 w-24"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="USD">USD ($)</SelectItem>
+                  <SelectItem value="EUR">EUR (€)</SelectItem>
+                  <SelectItem value="TRY">TRY (₺)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Manuel Kur (1 {docCurrency} = ? ₺)</Label>
+              <Input type="number" step="0.0001" value={manualRate}
+                onChange={(e) => setManualRate(+e.target.value)} className="h-9 w-32" />
+            </div>
+            <div className="h-9 w-px bg-border" />
             <div className="text-xs text-muted-foreground">
-              {selected.size > 0 ? `${selected.size} satır seçili` : "Uygulamak için satır seçin"}
+              {selected.size > 0 ? `${selected.size} satır seçili` : "Toplu için satır seçin"}
             </div>
             <div>
               <Label className="text-xs">Seçilenlere % artış</Label>
               <div className="flex items-center gap-1">
-                <Input type="number" value={bulkMarkup} onChange={(e) => setBulkMarkup(+e.target.value)} className="w-24" />
+                <Input type="number" value={bulkMarkup} onChange={(e) => setBulkMarkup(+e.target.value)} className="h-9 w-20" />
                 <Button size="sm" variant="outline" onClick={applyBulkMarkup}><Percent className="h-3.5 w-3.5" /></Button>
               </div>
             </div>
             <div>
-              <Label className="text-xs">Genel İskonto</Label>
+              <Label className="text-xs">Genel İskonto %</Label>
               <div className="flex items-center gap-1">
-                <Input type="number" value={bulkDiscount} onChange={(e) => setBulkDiscount(+e.target.value)} className="w-24" />
+                <Input type="number" value={bulkDiscount} onChange={(e) => setBulkDiscount(+e.target.value)} className="h-9 w-20" />
                 <Button size="sm" variant="outline" onClick={applyBulkDiscount}><Percent className="h-3.5 w-3.5" /></Button>
               </div>
             </div>
@@ -242,10 +265,8 @@ function Page() {
                 <Trash2 className="mr-1 h-4 w-4" /> Sil
               </Button>
             )}
-            <div className="ml-auto text-xs text-muted-foreground">
-              Kur: 1 USD ≈ {rates.USD.toFixed(2)} ₺ · 1 EUR ≈ {rates.EUR.toFixed(2)} ₺
-            </div>
           </div>
+
 
           {/* Ürün tablosu */}
           <div className="mt-4 overflow-x-auto">

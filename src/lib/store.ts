@@ -21,12 +21,14 @@ type Actions = {
   addSales: (v: Omit<Invoice, "id">) => void;
   bulkAddSales: (v: Omit<Invoice, "id">[]) => void;
   updateSales: (id: string, patch: Partial<Invoice>) => void;
+  bulkUpdateSales: (ids: string[], patch: Partial<Invoice>) => void;
   removeSales: (id: string) => void;
   bulkRemoveSales: (ids: string[]) => void;
   // purchase
   addPurchase: (v: Omit<Invoice, "id">) => void;
   bulkAddPurchase: (v: Omit<Invoice, "id">[]) => void;
   updatePurchase: (id: string, patch: Partial<Invoice>) => void;
+  bulkUpdatePurchase: (ids: string[], patch: Partial<Invoice>) => void;
   removePurchase: (id: string) => void;
   bulkRemovePurchase: (ids: string[]) => void;
   // cari
@@ -85,12 +87,14 @@ export const useStore = create<State & Actions>()(
       addSales: (v) => set((s) => ({ salesInvoices: [{ ...v, id: uid() }, ...s.salesInvoices] })),
       bulkAddSales: (list) => set((s) => ({ salesInvoices: [...list.map((v) => ({ ...v, id: uid() })), ...s.salesInvoices] })),
       updateSales: (id, patch) => set((s) => ({ salesInvoices: s.salesInvoices.map((x) => x.id === id ? { ...x, ...patch } : x) })),
+      bulkUpdateSales: (ids, patch) => set((s) => ({ salesInvoices: s.salesInvoices.map((x) => ids.includes(x.id) ? { ...x, ...patch } : x) })),
       removeSales: (id) => set((s) => ({ salesInvoices: s.salesInvoices.filter((x) => x.id !== id) })),
       bulkRemoveSales: (ids) => set((s) => ({ salesInvoices: s.salesInvoices.filter((x) => !ids.includes(x.id)) })),
 
       addPurchase: (v) => set((s) => ({ purchaseInvoices: [{ ...v, id: uid() }, ...s.purchaseInvoices] })),
       bulkAddPurchase: (list) => set((s) => ({ purchaseInvoices: [...list.map((v) => ({ ...v, id: uid() })), ...s.purchaseInvoices] })),
       updatePurchase: (id, patch) => set((s) => ({ purchaseInvoices: s.purchaseInvoices.map((x) => x.id === id ? { ...x, ...patch } : x) })),
+      bulkUpdatePurchase: (ids, patch) => set((s) => ({ purchaseInvoices: s.purchaseInvoices.map((x) => ids.includes(x.id) ? { ...x, ...patch } : x) })),
       removePurchase: (id) => set((s) => ({ purchaseInvoices: s.purchaseInvoices.filter((x) => x.id !== id) })),
       bulkRemovePurchase: (ids) => set((s) => ({ purchaseInvoices: s.purchaseInvoices.filter((x) => !ids.includes(x.id)) })),
 

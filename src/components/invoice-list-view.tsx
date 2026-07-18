@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,79 +8,98 @@ import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, Table
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { FileSpreadsheet, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CheckCircle2, ChevronsUpDown, Clock, FileSpreadsheet, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { fmtTL, type Invoice } from "@/lib/mock-data";
+import { fmtTL, type Invoice, type InvoiceStatus } from "@/lib/mock-data";
 import { ExcelImportDialog } from "@/components/excel-import-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { useSelection } from "@/hooks/use-selection";
 import { INVOICE_TEMPLATE_HEADERS, rowsToInvoices } from "@/lib/importers";
+import { useStore } from "@/lib/store";
+
+type Kind = "sales" | "purchase";
 
 type Props = {
   title: string;
-  partyLabel: string; // "Müşteri" | "Tedarikçi"
-  newPrefix: string; // "SF" | "AF"
+  partyLabel: string;
+  newPrefix: string;
+  kind: Kind;
   list: Invoice[];
   add: (v: Omit<Invoice, "id">) => void;
   bulkAdd: (v: Omit<Invoice, "id">[]) => void;
   update: (id: string, patch: Partial<Invoice>) => void;
+  bulkUpdate: (ids: string[], patch: Partial<Invoice>) => void;
   remove: (id: string) => void;
   bulkRemove: (ids: string[]) => void;
 };
+
+const STATUS_SALES: InvoiceStatus[] = ["Ödeme Bekleniyor", "Tahsil Edildi", "Onaylı", "Taslak", "İptal"];
+const STATUS_PURCHASE: InvoiceStatus[] = ["Ödeme Yapılacak", "Ödendi", "Onaylı", "Taslak", "İptal"];
 
 const emptyForm = (prefix: string): Omit<Invoice, "id"> => ({
   no: `${prefix}-${Date.now().toString().slice(-6)}`,
   date: new Date().toISOString().slice(0, 10),
   party: "",
-  subtotal: 0,
-  vat: 0,
-  discount: 0,
-  total: 0,
+  subtotal: 0, vat: 0, discount: 0, total: 0,
   status: "Ödeme Bekleniyor",
 });
 
 export function InvoiceListView({
-  title, partyLabel, newPrefix, list, add, bulkAdd, update, remove, bulkRemove,
+  title, partyLabel, newPrefix, kind, list, add, bulkAdd, update, bulkUpdate, remove, bulkRemove,
 }: Props) {
   const [q, setQ] = useState("");
   const [openNew, setOpenNew] = useState(false);
   const [form, setForm] = useState<Omit<Invoice, "id">>(emptyForm(newPrefix));
   const [editing, setEditing] = useState<Invoice | null>(null);
 
-  const filtered = list.filter(
+  const statuses = kind === "sales" ? STATUS_SALES : STATUS_PURCHASE;
+  const primaryPaid: InvoiceStatus = kind === "sales" ? "Tahsil Edildi" : "Ödendi";
+  const primaryWait: InvoiceStatus = kind === "sales" ? "Ödeme Bekleniyor" : "Ödeme Yapılacak";
+
+  const sorted = useMemo(
+    () => [...list].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)),
+    [list],
+  );
+  const filtered = sorted.filter(
     (s) => s.no.toLowerCase().includes(q.toLowerCase()) || s.party.toLowerCase().includes(q.toLowerCase()),
   );
   const sel = useSelection(filtered);
 
-  function calcTotal(f: Omit<Invoice, "id">) {
-    return (f.subtotal ?? 0) + (f.vat ?? 0) - (f.discount ?? 0);
-  }
+  const calc = (f: Omit<Invoice, "id">) => (f.subtotal ?? 0) + (f.vat ?? 0) - (f.discount ?? 0);
 
   function saveNew() {
     if (!form.party) return toast.error(`${partyLabel} girin`);
-    const total = form.total || calcTotal(form);
-    add({ ...form, total });
+    add({ ...form, total: form.total || calc(form) });
     setOpenNew(false);
     setForm(emptyForm(newPrefix));
     toast.success("Kaydedildi");
   }
-
   function saveEdit() {
     if (!editing) return;
-    const total = editing.total || calcTotal(editing);
-    update(editing.id, { ...editing, total });
+    update(editing.id, { ...editing, total: editing.total || calc(editing) });
     setEditing(null);
     toast.success("Güncellendi");
   }
 
-  function bulkDelete() {
-    bulkRemove(sel.selectedIds);
-    toast.success(`${sel.selectedIds.length} kayıt silindi`);
+  const targetIds = sel.selectedIds.length ? sel.selectedIds : filtered.map((x) => x.id);
+  const targetLabel = sel.selectedIds.length ? `Seçili (${sel.selectedIds.length})` : `Tümü (${filtered.length})`;
+
+  function setStatusAll(status: InvoiceStatus) {
+    if (!targetIds.length) return toast.error("Kayıt yok");
+    bulkUpdate(targetIds, { status });
+    toast.success(`${targetIds.length} kayıt → ${status}`);
     sel.clear();
   }
 
@@ -91,24 +110,39 @@ export function InvoiceListView({
         subtitle={`${list.length} kayıt`}
         actions={
           <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <CheckCircle2 className="mr-1 h-4 w-4" /> Durum: {targetLabel}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setStatusAll(primaryPaid)}>
+                  <CheckCircle2 className="mr-2 h-4 w-4 text-success" /> {primaryPaid}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setStatusAll(primaryWait)}>
+                  <Clock className="mr-2 h-4 w-4 text-warning" /> {primaryWait}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <ExcelImportDialog
               title={`${title} — Excel içe aktar`}
-              description="Şablon başlıklarına göre otomatik eşlenir. Farklı yazımlar da tanınır (örn. 'Firma' / 'Müşteri')."
+              description="Şablon başlıklarına göre otomatik eşlenir."
               templateName={`${title.toLowerCase().replace(/\s+/g, "-")}-sablon.xlsx`}
               templateHeaders={INVOICE_TEMPLATE_HEADERS}
               templateSample={[["FTR2026000001", new Date(), "Örnek Firma A.Ş.", 1000, 200, 0, 1200]]}
               onImport={(rows) => { const l = rowsToInvoices(rows); bulkAdd(l); return l.length; }}
-              trigger={<Button variant="outline" size="sm"><FileSpreadsheet className="mr-1 h-4 w-4" /> Excel İçe Aktar</Button>}
+              trigger={<Button variant="outline" size="sm"><FileSpreadsheet className="mr-1 h-4 w-4" /> Excel</Button>}
             />
             <Dialog open={openNew} onOpenChange={(v) => { setOpenNew(v); if (v) setForm(emptyForm(newPrefix)); }}>
               <DialogTrigger asChild>
                 <Button size="sm" className="gradient-primary text-primary-foreground shadow-elegant">
-                  <Plus className="mr-1 h-4 w-4" /> Yeni {title.split(" ")[0]} Faturası
+                  <Plus className="mr-1 h-4 w-4" /> Yeni Fatura
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-lg">
                 <DialogHeader><DialogTitle>Yeni {title}</DialogTitle></DialogHeader>
-                <InvoiceForm value={form} onChange={setForm} partyLabel={partyLabel} />
+                <InvoiceForm value={form} onChange={setForm} partyLabel={partyLabel} statuses={statuses} />
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setOpenNew(false)}>İptal</Button>
                   <Button onClick={saveNew} className="gradient-primary text-primary-foreground">Kaydet</Button>
@@ -130,7 +164,7 @@ export function InvoiceListView({
                 <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Fatura no veya firma ara..." className="pl-9" />
               </div>
               {sel.selectedIds.length > 0 && (
-                <Button variant="destructive" size="sm" onClick={bulkDelete}>
+                <Button variant="destructive" size="sm" onClick={() => { bulkRemove(sel.selectedIds); sel.clear(); }}>
                   <Trash2 className="mr-1 h-4 w-4" /> Seçilenleri Sil ({sel.selectedIds.length})
                 </Button>
               )}
@@ -170,13 +204,12 @@ export function InvoiceListView({
                       <TableCell className="text-right">{s.discount ? fmtTL(s.discount) : "—"}</TableCell>
                       <TableCell className="text-right font-semibold">{fmtTL(s.total)}</TableCell>
                       <TableCell>
-                        <Badge variant={
-                          s.status === "Tahsil Edildi" ? "default"
-                          : s.status === "Ödeme Bekleniyor" ? "secondary"
-                          : s.status === "Onaylı" ? "default"
-                          : s.status === "Taslak" ? "secondary"
-                          : "destructive"
-                        }>{s.status}</Badge>
+                        <Select value={s.status} onValueChange={(v) => update(s.id, { status: v as InvoiceStatus })}>
+                          <SelectTrigger className="h-7 w-[160px] text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {statuses.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
@@ -199,7 +232,7 @@ export function InvoiceListView({
                   return (
                     <TableFooter>
                       <TableRow className="bg-muted/40 font-semibold">
-                        <TableCell colSpan={4} className="text-right">TOPLAM ({filtered.length} kayıt)</TableCell>
+                        <TableCell colSpan={4} className="text-right">TOPLAM ({filtered.length})</TableCell>
                         <TableCell className="text-right">{fmtTL(sub)}</TableCell>
                         <TableCell className="text-right">{fmtTL(vat)}</TableCell>
                         <TableCell className="text-right">{fmtTL(disc)}</TableCell>
@@ -223,7 +256,7 @@ export function InvoiceListView({
               value={editing}
               onChange={(v) => setEditing({ ...editing, ...v })}
               partyLabel={partyLabel}
-              editing
+              statuses={statuses}
             />
           )}
           <DialogFooter>
@@ -237,52 +270,73 @@ export function InvoiceListView({
 }
 
 function InvoiceForm({
-  value, onChange, partyLabel, editing,
+  value, onChange, partyLabel, statuses,
 }: {
   value: Omit<Invoice, "id"> | Invoice;
   onChange: (v: any) => void;
   partyLabel: string;
-  editing?: boolean;
+  statuses: InvoiceStatus[];
 }) {
+  const cariList = useStore((s) => s.cariList);
+  const [open, setOpen] = useState(false);
   const set = (patch: Partial<Invoice>) => onChange({ ...value, ...patch });
   const auto = (value.subtotal ?? 0) + (value.vat ?? 0) - (value.discount ?? 0);
+
   return (
     <div className="grid gap-3">
       <div className="grid grid-cols-2 gap-2">
         <div><Label>Fatura No</Label><Input value={value.no} onChange={(e) => set({ no: e.target.value })} /></div>
         <div><Label>Tarih</Label><Input type="date" value={value.date} onChange={(e) => set({ date: e.target.value })} /></div>
       </div>
-      <div><Label>{partyLabel}</Label><Input value={value.party} onChange={(e) => set({ party: e.target.value })} /></div>
+      <div>
+        <Label>{partyLabel}</Label>
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+              <span className={value.party ? "" : "text-muted-foreground"}>{value.party || `${partyLabel} seçin veya yazın...`}</span>
+              <ChevronsUpDown className="h-4 w-4 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+            <Command>
+              <CommandInput placeholder="İsimle ara..." value={value.party} onValueChange={(v) => set({ party: v })} />
+              <CommandList>
+                <CommandEmpty>Cari bulunamadı. Yazdığınız isim kullanılacak.</CommandEmpty>
+                <CommandGroup>
+                  {cariList.map((c) => (
+                    <CommandItem key={c.id} value={c.title} onSelect={() => { set({ party: c.title }); setOpen(false); }}>
+                      <div>
+                        <div className="font-medium">{c.title}</div>
+                        <div className="text-xs text-muted-foreground">{c.code} · {c.phone || c.taxNo || "—"}</div>
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      </div>
       <div className="grid grid-cols-3 gap-2">
-        <div>
-          <Label>KDV Hariç</Label>
-          <Input type="number" value={value.subtotal ?? 0} onChange={(e) => set({ subtotal: +e.target.value })} />
-        </div>
-        <div>
-          <Label>KDV</Label>
-          <Input type="number" value={value.vat ?? 0} onChange={(e) => set({ vat: +e.target.value })} />
-        </div>
-        <div>
-          <Label>İskonto</Label>
-          <Input type="number" value={value.discount ?? 0} onChange={(e) => set({ discount: +e.target.value })} />
-        </div>
+        <div><Label>KDV Hariç</Label>
+          <Input type="number" value={value.subtotal ?? 0} onChange={(e) => set({ subtotal: +e.target.value })} /></div>
+        <div><Label>KDV</Label>
+          <Input type="number" value={value.vat ?? 0} onChange={(e) => set({ vat: +e.target.value })} /></div>
+        <div><Label>İskonto</Label>
+          <Input type="number" value={value.discount ?? 0} onChange={(e) => set({ discount: +e.target.value })} /></div>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div>
           <Label>Genel Toplam</Label>
           <Input type="number" value={value.total} onChange={(e) => set({ total: +e.target.value })} placeholder={String(auto)} />
-          <p className="mt-1 text-xs text-muted-foreground">Boş bırakırsanız otomatik: {fmtTL(auto)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Boş: {fmtTL(auto)}</p>
         </div>
         <div>
           <Label>Durum</Label>
-          <Select value={value.status} onValueChange={(v) => set({ status: v as any })}>
+          <Select value={value.status} onValueChange={(v) => set({ status: v as InvoiceStatus })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="Ödeme Bekleniyor">Ödeme Bekleniyor</SelectItem>
-              <SelectItem value="Tahsil Edildi">Tahsil Edildi</SelectItem>
-              <SelectItem value="Onaylı">Onaylı</SelectItem>
-              <SelectItem value="Taslak">Taslak</SelectItem>
-              <SelectItem value="İptal">İptal</SelectItem>
+              {statuses.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
