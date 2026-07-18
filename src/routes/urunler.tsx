@@ -10,15 +10,17 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { FileSpreadsheet, ImageOff, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FileSpreadsheet, ImageOff, Pencil, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { fmtTL, type Product } from "@/lib/mock-data";
+import { fmtTL, type Product, type Currency } from "@/lib/mock-data";
 import { useStore } from "@/lib/store";
 import { EmptyState } from "@/components/empty-state";
 import { ExcelImportDialog } from "@/components/excel-import-dialog";
 import { useSelection } from "@/hooks/use-selection";
 import { PRODUCT_TEMPLATE_HEADERS, rowsToProducts } from "@/lib/importers";
+import { useFxRates, toTRY } from "@/lib/fx";
 
 export const Route = createFileRoute("/urunler")({
   head: () => ({
@@ -32,8 +34,10 @@ export const Route = createFileRoute("/urunler")({
 
 const emptyForm = (): Omit<Product, "id"> => ({
   name: "", sku: "", barcode: "", category: "", brand: "", image: "",
-  price1: 0, tax: 20, buy: 0, sell: 0, vat: 20, stock: 0, minStock: 0,
+  price1: 0, currency: "TRY", tax: 20, buy: 0, sell: 0, vat: 20, stock: 0, minStock: 0,
 });
+
+const curSymbol = (c: Currency) => (c === "USD" ? "$" : c === "EUR" ? "€" : "₺");
 
 function Page() {
   const products = useStore((s) => s.products);
@@ -43,6 +47,7 @@ function Page() {
   const removeProduct = useStore((s) => s.removeProduct);
   const bulkRemove = useStore((s) => s.bulkRemoveProducts);
   const ensureCategory = useStore((s) => s.ensureCategory);
+  const { rates, loading, refresh } = useFxRates();
 
   const [q, setQ] = useState("");
   const [newOpen, setNewOpen] = useState(false);
@@ -64,7 +69,8 @@ function Page() {
   function saveManual() {
     if (!form.name) return toast.error("Ürün adı girin");
     if (form.category) ensureCategory(form.category);
-    const sell = +(form.price1 * (1 + form.tax / 100)).toFixed(2);
+    const tryPrice = toTRY(form.price1, form.currency, rates);
+    const sell = +(tryPrice * (1 + form.tax / 100)).toFixed(2);
     addProduct({ ...form, sell, vat: form.tax });
     setNewOpen(false);
     setForm(emptyForm());
@@ -74,7 +80,8 @@ function Page() {
   function saveEdit() {
     if (!editing) return;
     if (editing.category) ensureCategory(editing.category);
-    const sell = +(editing.price1 * (1 + editing.tax / 100)).toFixed(2);
+    const tryPrice = toTRY(editing.price1, editing.currency, rates);
+    const sell = +(tryPrice * (1 + editing.tax / 100)).toFixed(2);
     updateProduct(editing.id, { ...editing, sell, vat: editing.tax });
     setEditing(null);
     toast.success("Güncellendi");
@@ -90,15 +97,18 @@ function Page() {
     <div className="space-y-6">
       <PageHeader
         title="Ürünler"
-        subtitle={`${products.length} ürün`}
+        subtitle={`${products.length} ürün · USD ${rates.USD.toFixed(2)} ₺ · EUR ${rates.EUR.toFixed(2)} ₺`}
         actions={
           <>
+            <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
+              <RefreshCw className={`mr-1 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Kuru Güncelle
+            </Button>
             <ExcelImportDialog
               title="Ürünleri Excel'den içe aktar"
-              description="Sütun başlıkları: picture1Path, label, brand, stockCode, barcode, mainCategory, price1, tax. KDV dahil fiyat otomatik hesaplanır."
+              description="Sütunlar: picture1Path, label, brand, stockCode, barcode, mainCategory, price1, currency (TRY/USD/EUR), tax. Döviz seçilirse KDV dahil TL fiyatı güncel kurdan hesaplanır."
               templateName="urunler-sablon.xlsx"
               templateHeaders={PRODUCT_TEMPLATE_HEADERS}
-              templateSample={[["https://cdn.orn/urun.jpg", "Örnek Ürün", "Marka", "STK-001", "8690000000001", "Kategori", 100, 20]]}
+              templateSample={[["https://cdn.orn/urun.jpg", "Örnek Ürün", "Marka", "STK-001", "8690000000001", "Kategori", 100, "USD", 20]]}
               onImport={importExcel}
               trigger={<Button variant="outline" size="sm"><FileSpreadsheet className="mr-1 h-4 w-4" /> Excel İçe Aktar</Button>}
             />
@@ -110,7 +120,7 @@ function Page() {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>Yeni Ürün</DialogTitle></DialogHeader>
-                <ProductForm value={form} onChange={setForm} />
+                <ProductForm value={form} onChange={setForm} rates={rates} />
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setNewOpen(false)}>İptal</Button>
                   <Button onClick={saveManual} className="gradient-primary text-primary-foreground">Kaydet</Button>
@@ -153,45 +163,52 @@ function Page() {
                     <TableHead>Stok Kodu</TableHead>
                     <TableHead>Barkod</TableHead>
                     <TableHead>Kategori</TableHead>
-                    <TableHead className="text-right">Toptan (KDV Hariç)</TableHead>
+                    <TableHead className="text-right">Toptan</TableHead>
                     <TableHead className="text-right">KDV %</TableHead>
-                    <TableHead className="text-right">KDV Dahil</TableHead>
+                    <TableHead className="text-right">KDV Dahil (₺)</TableHead>
                     <TableHead className="w-20"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((p) => (
-                    <TableRow key={p.id} data-state={sel.selected.has(p.id) ? "selected" : undefined}>
-                      <TableCell>
-                        <Checkbox checked={sel.selected.has(p.id)} onCheckedChange={() => sel.toggle(p.id)} />
-                      </TableCell>
-                      <TableCell>
-                        {p.image ? (
-                          <img src={p.image} alt={p.name} loading="lazy" className="h-10 w-10 rounded-md object-cover border" />
-                        ) : (
-                          <div className="grid h-10 w-10 place-items-center rounded-md border bg-muted text-muted-foreground"><ImageOff className="h-4 w-4" /></div>
-                        )}
-                      </TableCell>
-                      <TableCell className="max-w-[280px] truncate font-medium">{p.name}</TableCell>
-                      <TableCell>{p.brand}</TableCell>
-                      <TableCell className="font-mono text-xs">{p.sku}</TableCell>
-                      <TableCell className="font-mono text-xs">{p.barcode}</TableCell>
-                      <TableCell>{p.category && <Badge variant="secondary">{p.category}</Badge>}</TableCell>
-                      <TableCell className="text-right">{fmtTL(p.price1)}</TableCell>
-                      <TableCell className="text-right">%{p.tax}</TableCell>
-                      <TableCell className="text-right font-semibold">{fmtTL(p.sell)}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => setEditing(p)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => { removeProduct(p.id); toast.success("Silindi"); }}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {filtered.map((p) => {
+                    const tl = toTRY(p.price1, p.currency, rates);
+                    const inc = +(tl * (1 + p.tax / 100)).toFixed(2);
+                    return (
+                      <TableRow key={p.id} data-state={sel.selected.has(p.id) ? "selected" : undefined}>
+                        <TableCell>
+                          <Checkbox checked={sel.selected.has(p.id)} onCheckedChange={() => sel.toggle(p.id)} />
+                        </TableCell>
+                        <TableCell>
+                          {p.image ? (
+                            <img src={p.image} alt={p.name} loading="lazy" className="h-10 w-10 rounded-md object-cover border" />
+                          ) : (
+                            <div className="grid h-10 w-10 place-items-center rounded-md border bg-muted text-muted-foreground"><ImageOff className="h-4 w-4" /></div>
+                          )}
+                        </TableCell>
+                        <TableCell className="max-w-[280px] truncate font-medium">{p.name}</TableCell>
+                        <TableCell>{p.brand}</TableCell>
+                        <TableCell className="font-mono text-xs">{p.sku}</TableCell>
+                        <TableCell className="font-mono text-xs">{p.barcode}</TableCell>
+                        <TableCell>{p.category && <Badge variant="secondary">{p.category}</Badge>}</TableCell>
+                        <TableCell className="text-right">
+                          <div>{curSymbol(p.currency)}{p.price1.toLocaleString("tr-TR")}</div>
+                          {p.currency !== "TRY" && <div className="text-xs text-muted-foreground">≈ {fmtTL(tl)}</div>}
+                        </TableCell>
+                        <TableCell className="text-right">%{p.tax}</TableCell>
+                        <TableCell className="text-right font-semibold">{fmtTL(inc)}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => setEditing(p)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => { removeProduct(p.id); toast.success("Silindi"); }}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -202,7 +219,7 @@ function Page() {
       <Dialog open={!!editing} onOpenChange={(v) => !v && setEditing(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>Ürünü Düzenle</DialogTitle></DialogHeader>
-          {editing && <ProductForm value={editing} onChange={(v) => setEditing({ ...editing, ...v })} />}
+          {editing && <ProductForm value={editing} onChange={(v) => setEditing({ ...editing, ...v })} rates={rates} />}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditing(null)}>İptal</Button>
             <Button onClick={saveEdit} className="gradient-primary text-primary-foreground">Güncelle</Button>
@@ -213,9 +230,10 @@ function Page() {
   );
 }
 
-function ProductForm({ value, onChange }: { value: any; onChange: (v: any) => void }) {
+function ProductForm({ value, onChange, rates }: { value: any; onChange: (v: any) => void; rates: { USD: number; EUR: number } }) {
   const set = (patch: any) => onChange({ ...value, ...patch });
-  const kdvDahil = +(value.price1 * (1 + value.tax / 100)).toFixed(2);
+  const tl = value.currency === "TRY" ? value.price1 : value.price1 * (value.currency === "USD" ? rates.USD : rates.EUR);
+  const kdvDahil = +(tl * (1 + value.tax / 100)).toFixed(2);
   return (
     <div className="grid gap-3">
       <div><Label>Resim URL (picture1Path)</Label><Input value={value.image ?? ""} onChange={(e) => set({ image: e.target.value })} /></div>
@@ -228,12 +246,25 @@ function ProductForm({ value, onChange }: { value: any; onChange: (v: any) => vo
         <div><Label>Stok Kodu</Label><Input value={value.sku} onChange={(e) => set({ sku: e.target.value })} /></div>
         <div><Label>Barkod</Label><Input value={value.barcode} onChange={(e) => set({ barcode: e.target.value })} /></div>
       </div>
-      <div className="grid grid-cols-3 gap-2">
-        <div><Label>Toptan (KDV Hariç)</Label><Input type="number" value={value.price1 ?? 0} onChange={(e) => set({ price1: +e.target.value })} /></div>
+      <div className="grid grid-cols-4 gap-2">
+        <div className="col-span-2"><Label>Toptan Fiyat (price1)</Label><Input type="number" value={value.price1 ?? 0} onChange={(e) => set({ price1: +e.target.value })} /></div>
+        <div>
+          <Label>Para Birimi</Label>
+          <Select value={value.currency} onValueChange={(v) => set({ currency: v as Currency })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="TRY">₺ TRY</SelectItem>
+              <SelectItem value="USD">$ USD</SelectItem>
+              <SelectItem value="EUR">€ EUR</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div><Label>KDV %</Label><Input type="number" value={value.tax ?? 20} onChange={(e) => set({ tax: +e.target.value })} /></div>
-        <div><Label>Stok</Label><Input type="number" value={value.stock ?? 0} onChange={(e) => set({ stock: +e.target.value })} /></div>
       </div>
-      <p className="text-xs text-muted-foreground">KDV Dahil: <span className="font-semibold text-foreground">{fmtTL(kdvDahil || 0)}</span></p>
+      <p className="text-xs text-muted-foreground">
+        {value.currency !== "TRY" && <>Kur: 1 {value.currency} ≈ {(value.currency === "USD" ? rates.USD : rates.EUR).toFixed(2)} ₺ · </>}
+        KDV Dahil: <span className="font-semibold text-foreground">{fmtTL(kdvDahil || 0)}</span>
+      </p>
     </div>
   );
 }

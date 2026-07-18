@@ -28,6 +28,8 @@ export type Cari = {
   type: "Müşteri" | "Tedarikçi";
 };
 
+export type Currency = "TRY" | "USD" | "EUR";
+
 export type Product = {
   id: string;
   barcode: string;
@@ -36,8 +38,9 @@ export type Product = {
   category: string;
   brand: string;
   image?: string;
-  price1: number;
-  tax: number;
+  price1: number;         // Toptan fiyat (döviz ise currency cinsinden)
+  currency: Currency;     // price1 birimi
+  tax: number;            // KDV %
   buy: number;
   sell: number;
   vat: number;
