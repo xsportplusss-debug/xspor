@@ -5,11 +5,10 @@ import { loadFromCloud, initAutoSync, stopSync } from "@/lib/cloud-sync";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Loader2, LogOut } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
-type Status = "loading" | "auth" | "hydrating" | "ready" | "forbidden";
+type Status = "loading" | "auth" | "hydrating" | "ready";
 
-const ALLOWED_EMAIL = "xsportplusss@gmail.com";
 let syncInitialized = false;
 
 export function AuthGate({ children }: { children: ReactNode }) {
@@ -18,11 +17,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    const handleSession = async (userId: string, email?: string | null) => {
-      if ((email ?? "").toLowerCase() !== ALLOWED_EMAIL) {
-        if (!cancelled) setStatus("forbidden");
-        return;
-      }
+    const handleSession = async (userId: string) => {
       setStatus("hydrating");
       await loadFromCloud(userId);
       if (!syncInitialized) {
@@ -34,12 +29,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return;
-      if (data.session) handleSession(data.session.user.id, data.session.user.email);
+      if (data.session) handleSession(data.session.user.id);
       else setStatus("auth");
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" && session) handleSession(session.user.id, session.user.email);
+      if (event === "SIGNED_IN" && session) handleSession(session.user.id);
       if (event === "SIGNED_OUT") {
         stopSync();
         setStatus("auth");
@@ -63,7 +58,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
     );
   }
 
-  if (status === "forbidden") return <ForbiddenScreen />;
   if (status === "auth") return <AuthScreen />;
   return <>{children}</>;
 }
@@ -98,33 +92,6 @@ function AuthScreen() {
                 <GoogleIcon /> <span className="ml-2">Google ile Giriş Yap</span>
               </>
             )}
-          </Button>
-          <p className="text-center text-xs text-muted-foreground">
-            Yalnızca yetkili hesap erişebilir.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function ForbiddenScreen() {
-  const signOut = async () => {
-    await supabase.auth.signOut();
-  };
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-muted p-4">
-      <Card className="w-full max-w-md glass shadow-elegant">
-        <CardHeader>
-          <CardTitle className="text-center text-xl">Yetkisiz Erişim</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-center text-sm text-muted-foreground">
-            Bu hesap Fintra verilerine erişim yetkisine sahip değil. Lütfen yetkili
-            Google hesabıyla giriş yapın.
-          </p>
-          <Button onClick={signOut} variant="outline" className="w-full">
-            <LogOut className="mr-2 h-4 w-4" /> Çıkış Yap
           </Button>
         </CardContent>
       </Card>
