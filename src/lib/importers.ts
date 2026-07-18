@@ -142,12 +142,15 @@ export function linesToInvoices(lines: string[][]): Omit<Invoice, "id">[] {
 }
 
 // ---------- Ürünler ----------
-// Katalog Excel: picture1Path, label, brand, stockCode, barcode, mainCategory, price1, tax
+// Katalog Excel: picture1Path, label, brand, stockCode, barcode, mainCategory, price1, currency, tax
 export function rowsToProducts(rows: Row[]): Omit<Product, "id">[] {
   return rows.map((r) => {
     const price1 = NUM(pick(r, ["price1", "toptan fiyat", "fiyat"]));
     const tax = NUM(pick(r, ["tax", "kdv orani", "kdv"])) || 20;
-    const sell = +(price1 * (1 + tax / 100)).toFixed(2);
+    const rawCur = STR(pick(r, ["currency", "para birimi", "doviz", "kur"])).toUpperCase();
+    const currency: "TRY" | "USD" | "EUR" =
+      rawCur.includes("USD") || rawCur.includes("$") || rawCur === "DOLAR" ? "USD" :
+      rawCur.includes("EUR") || rawCur.includes("€") || rawCur === "EURO" ? "EUR" : "TRY";
     return {
       name: STR(pick(r, ["label", "urun adi", "ad", "name", "title"])),
       sku: STR(pick(r, ["stockcode", "stok kodu", "sku", "kod", "code"])),
@@ -155,7 +158,8 @@ export function rowsToProducts(rows: Row[]): Omit<Product, "id">[] {
       category: STR(pick(r, ["maincategory", "kategori", "category"])),
       brand: STR(pick(r, ["brand", "marka"])),
       image: STR(pick(r, ["picture1path", "resim", "image", "gorsel"])),
-      price1, tax, sell,
+      price1, currency, tax,
+      sell: +(price1 * (1 + tax / 100)).toFixed(2),
       buy: NUM(pick(r, ["buyingprice", "alis"])),
       vat: tax,
       stock: NUM(pick(r, ["stockamount", "stok"])),
