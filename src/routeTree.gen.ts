@@ -19,6 +19,7 @@ import { Route as KategorilerRouteImport } from './routes/kategoriler'
 import { Route as KasaRouteImport } from './routes/kasa'
 import { Route as GiderlerRouteImport } from './routes/giderler'
 import { Route as GelirlerRouteImport } from './routes/gelirler'
+import { Route as FiyatTeklifiRouteImport } from './routes/fiyat-teklifi'
 import { Route as FirmaAyarlariRouteImport } from './routes/firma-ayarlari'
 import { Route as EArsivRouteImport } from './routes/e-arsiv'
 import { Route as CariHesaplarRouteImport } from './routes/cari-hesaplar'
@@ -82,6 +83,11 @@ const GiderlerRoute = GiderlerRouteImport.update({
 const GelirlerRoute = GelirlerRouteImport.update({
   id: '/gelirler',
   path: '/gelirler',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FiyatTeklifiRoute = FiyatTeklifiRouteImport.update({
+  id: '/fiyat-teklifi',
+  path: '/fiyat-teklifi',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FirmaAyarlariRoute = FirmaAyarlariRouteImport.update({
@@ -163,6 +169,7 @@ export interface FileRoutesByFullPath {
   '/cari-hesaplar': typeof CariHesaplarRoute
   '/e-arsiv': typeof EArsivRoute
   '/firma-ayarlari': typeof FirmaAyarlariRoute
+  '/fiyat-teklifi': typeof FiyatTeklifiRoute
   '/gelirler': typeof GelirlerRoute
   '/giderler': typeof GiderlerRoute
   '/kasa': typeof KasaRouteWithChildren
@@ -189,6 +196,7 @@ export interface FileRoutesByTo {
   '/cari-hesaplar': typeof CariHesaplarRoute
   '/e-arsiv': typeof EArsivRoute
   '/firma-ayarlari': typeof FirmaAyarlariRoute
+  '/fiyat-teklifi': typeof FiyatTeklifiRoute
   '/gelirler': typeof GelirlerRoute
   '/giderler': typeof GiderlerRoute
   '/kasa': typeof KasaRouteWithChildren
@@ -216,6 +224,7 @@ export interface FileRoutesById {
   '/cari-hesaplar': typeof CariHesaplarRoute
   '/e-arsiv': typeof EArsivRoute
   '/firma-ayarlari': typeof FirmaAyarlariRoute
+  '/fiyat-teklifi': typeof FiyatTeklifiRoute
   '/gelirler': typeof GelirlerRoute
   '/giderler': typeof GiderlerRoute
   '/kasa': typeof KasaRouteWithChildren
@@ -244,6 +253,7 @@ export interface FileRouteTypes {
     | '/cari-hesaplar'
     | '/e-arsiv'
     | '/firma-ayarlari'
+    | '/fiyat-teklifi'
     | '/gelirler'
     | '/giderler'
     | '/kasa'
@@ -270,6 +280,7 @@ export interface FileRouteTypes {
     | '/cari-hesaplar'
     | '/e-arsiv'
     | '/firma-ayarlari'
+    | '/fiyat-teklifi'
     | '/gelirler'
     | '/giderler'
     | '/kasa'
@@ -296,6 +307,7 @@ export interface FileRouteTypes {
     | '/cari-hesaplar'
     | '/e-arsiv'
     | '/firma-ayarlari'
+    | '/fiyat-teklifi'
     | '/gelirler'
     | '/giderler'
     | '/kasa'
@@ -323,6 +335,7 @@ export interface RootRouteChildren {
   CariHesaplarRoute: typeof CariHesaplarRoute
   EArsivRoute: typeof EArsivRoute
   FirmaAyarlariRoute: typeof FirmaAyarlariRoute
+  FiyatTeklifiRoute: typeof FiyatTeklifiRoute
   GelirlerRoute: typeof GelirlerRoute
   GiderlerRoute: typeof GiderlerRoute
   KasaRoute: typeof KasaRouteWithChildren
@@ -410,6 +423,13 @@ declare module '@tanstack/react-router' {
       path: '/gelirler'
       fullPath: '/gelirler'
       preLoaderRoute: typeof GelirlerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fiyat-teklifi': {
+      id: '/fiyat-teklifi'
+      path: '/fiyat-teklifi'
+      fullPath: '/fiyat-teklifi'
+      preLoaderRoute: typeof FiyatTeklifiRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/firma-ayarlari': {
@@ -543,6 +563,7 @@ const rootRouteChildren: RootRouteChildren = {
   CariHesaplarRoute: CariHesaplarRoute,
   EArsivRoute: EArsivRoute,
   FirmaAyarlariRoute: FirmaAyarlariRoute,
+  FiyatTeklifiRoute: FiyatTeklifiRoute,
   GelirlerRoute: GelirlerRoute,
   GiderlerRoute: GiderlerRoute,
   KasaRoute: KasaRouteWithChildren,

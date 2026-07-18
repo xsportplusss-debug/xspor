@@ -10,7 +10,7 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { FileSpreadsheet, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { FileSpreadsheet, ImageOff, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { fmtTL, type Product } from "@/lib/mock-data";
@@ -30,7 +30,10 @@ export const Route = createFileRoute("/urunler")({
   component: Page,
 });
 
-const emptyForm = () => ({ name: "", sku: "", barcode: "", category: "", buy: 0, sell: 0, vat: 20, stock: 0, minStock: 0, brand: "" });
+const emptyForm = (): Omit<Product, "id"> => ({
+  name: "", sku: "", barcode: "", category: "", brand: "", image: "",
+  price1: 0, tax: 20, buy: 0, sell: 0, vat: 20, stock: 0, minStock: 0,
+});
 
 function Page() {
   const products = useStore((s) => s.products);
@@ -43,11 +46,11 @@ function Page() {
 
   const [q, setQ] = useState("");
   const [newOpen, setNewOpen] = useState(false);
-  const [form, setForm] = useState(emptyForm());
+  const [form, setForm] = useState<Omit<Product, "id">>(emptyForm());
   const [editing, setEditing] = useState<Product | null>(null);
 
   const filtered = products.filter((p) =>
-    [p.name, p.sku, p.barcode, p.category].filter(Boolean).some((v) => v.toLowerCase().includes(q.toLowerCase())),
+    [p.name, p.sku, p.barcode, p.category, p.brand].filter(Boolean).some((v) => v.toLowerCase().includes(q.toLowerCase())),
   );
   const sel = useSelection(filtered);
 
@@ -61,7 +64,8 @@ function Page() {
   function saveManual() {
     if (!form.name) return toast.error("Ürün adı girin");
     if (form.category) ensureCategory(form.category);
-    addProduct(form);
+    const sell = +(form.price1 * (1 + form.tax / 100)).toFixed(2);
+    addProduct({ ...form, sell, vat: form.tax });
     setNewOpen(false);
     setForm(emptyForm());
     toast.success("Ürün eklendi");
@@ -70,7 +74,8 @@ function Page() {
   function saveEdit() {
     if (!editing) return;
     if (editing.category) ensureCategory(editing.category);
-    updateProduct(editing.id, editing);
+    const sell = +(editing.price1 * (1 + editing.tax / 100)).toFixed(2);
+    updateProduct(editing.id, { ...editing, sell, vat: editing.tax });
     setEditing(null);
     toast.success("Güncellendi");
   }
@@ -90,10 +95,10 @@ function Page() {
           <>
             <ExcelImportDialog
               title="Ürünleri Excel'den içe aktar"
-              description="Barkod veya stok kodu daha önce eklenmişse tekrar eklenmez."
+              description="Sütun başlıkları: picture1Path, label, brand, stockCode, barcode, mainCategory, price1, tax. KDV dahil fiyat otomatik hesaplanır."
               templateName="urunler-sablon.xlsx"
               templateHeaders={PRODUCT_TEMPLATE_HEADERS}
-              templateSample={[["Örnek Ürün", "STK-001", "8690000000001", "Genel"]]}
+              templateSample={[["https://cdn.orn/urun.jpg", "Örnek Ürün", "Marka", "STK-001", "8690000000001", "Kategori", 100, 20]]}
               onImport={importExcel}
               trigger={<Button variant="outline" size="sm"><FileSpreadsheet className="mr-1 h-4 w-4" /> Excel İçe Aktar</Button>}
             />
@@ -124,7 +129,7 @@ function Page() {
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <div className="relative min-w-[220px] flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ad, stok kodu, barkod, kategori..." className="pl-9" />
+                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ad, marka, stok kodu, barkod, kategori..." className="pl-9" />
               </div>
               {sel.selectedIds.length > 0 && (
                 <Button variant="destructive" size="sm" onClick={bulkDelete}>
@@ -142,12 +147,15 @@ function Page() {
                         onCheckedChange={sel.toggleAll}
                       />
                     </TableHead>
-                    <TableHead>Barkod</TableHead>
-                    <TableHead>Stok Kodu</TableHead>
+                    <TableHead className="w-16">Resim</TableHead>
                     <TableHead>Ürün Adı</TableHead>
+                    <TableHead>Marka</TableHead>
+                    <TableHead>Stok Kodu</TableHead>
+                    <TableHead>Barkod</TableHead>
                     <TableHead>Kategori</TableHead>
-                    <TableHead className="text-right">Satış</TableHead>
-                    <TableHead className="text-right">Stok</TableHead>
+                    <TableHead className="text-right">Toptan (KDV Hariç)</TableHead>
+                    <TableHead className="text-right">KDV %</TableHead>
+                    <TableHead className="text-right">KDV Dahil</TableHead>
                     <TableHead className="w-20"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -157,12 +165,21 @@ function Page() {
                       <TableCell>
                         <Checkbox checked={sel.selected.has(p.id)} onCheckedChange={() => sel.toggle(p.id)} />
                       </TableCell>
+                      <TableCell>
+                        {p.image ? (
+                          <img src={p.image} alt={p.name} loading="lazy" className="h-10 w-10 rounded-md object-cover border" />
+                        ) : (
+                          <div className="grid h-10 w-10 place-items-center rounded-md border bg-muted text-muted-foreground"><ImageOff className="h-4 w-4" /></div>
+                        )}
+                      </TableCell>
+                      <TableCell className="max-w-[280px] truncate font-medium">{p.name}</TableCell>
+                      <TableCell>{p.brand}</TableCell>
+                      <TableCell className="font-mono text-xs">{p.sku}</TableCell>
                       <TableCell className="font-mono text-xs">{p.barcode}</TableCell>
-                      <TableCell className="font-medium">{p.sku}</TableCell>
-                      <TableCell>{p.name}</TableCell>
                       <TableCell>{p.category && <Badge variant="secondary">{p.category}</Badge>}</TableCell>
-                      <TableCell className="text-right">{p.sell ? fmtTL(p.sell) : "—"}</TableCell>
-                      <TableCell className="text-right">{p.stock}</TableCell>
+                      <TableCell className="text-right">{fmtTL(p.price1)}</TableCell>
+                      <TableCell className="text-right">%{p.tax}</TableCell>
+                      <TableCell className="text-right font-semibold">{fmtTL(p.sell)}</TableCell>
                       <TableCell>
                         <div className="flex gap-1">
                           <Button variant="ghost" size="icon" onClick={() => setEditing(p)}>
@@ -198,19 +215,25 @@ function Page() {
 
 function ProductForm({ value, onChange }: { value: any; onChange: (v: any) => void }) {
   const set = (patch: any) => onChange({ ...value, ...patch });
+  const kdvDahil = +(value.price1 * (1 + value.tax / 100)).toFixed(2);
   return (
     <div className="grid gap-3">
-      <div><Label>Ürün Adı</Label><Input value={value.name} onChange={(e) => set({ name: e.target.value })} /></div>
+      <div><Label>Resim URL (picture1Path)</Label><Input value={value.image ?? ""} onChange={(e) => set({ image: e.target.value })} /></div>
+      <div><Label>Ürün Adı (label)</Label><Input value={value.name} onChange={(e) => set({ name: e.target.value })} /></div>
+      <div className="grid grid-cols-2 gap-2">
+        <div><Label>Marka</Label><Input value={value.brand} onChange={(e) => set({ brand: e.target.value })} /></div>
+        <div><Label>Kategori (mainCategory)</Label><Input value={value.category} onChange={(e) => set({ category: e.target.value })} /></div>
+      </div>
       <div className="grid grid-cols-2 gap-2">
         <div><Label>Stok Kodu</Label><Input value={value.sku} onChange={(e) => set({ sku: e.target.value })} /></div>
         <div><Label>Barkod</Label><Input value={value.barcode} onChange={(e) => set({ barcode: e.target.value })} /></div>
       </div>
-      <div><Label>Kategori</Label><Input value={value.category} onChange={(e) => set({ category: e.target.value })} /></div>
       <div className="grid grid-cols-3 gap-2">
-        <div><Label>Alış</Label><Input type="number" value={value.buy ?? 0} onChange={(e) => set({ buy: +e.target.value })} /></div>
-        <div><Label>Satış</Label><Input type="number" value={value.sell ?? 0} onChange={(e) => set({ sell: +e.target.value })} /></div>
+        <div><Label>Toptan (KDV Hariç)</Label><Input type="number" value={value.price1 ?? 0} onChange={(e) => set({ price1: +e.target.value })} /></div>
+        <div><Label>KDV %</Label><Input type="number" value={value.tax ?? 20} onChange={(e) => set({ tax: +e.target.value })} /></div>
         <div><Label>Stok</Label><Input type="number" value={value.stock ?? 0} onChange={(e) => set({ stock: +e.target.value })} /></div>
       </div>
+      <p className="text-xs text-muted-foreground">KDV Dahil: <span className="font-semibold text-foreground">{fmtTL(kdvDahil || 0)}</span></p>
     </div>
   );
 }

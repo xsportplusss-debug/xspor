@@ -36,23 +36,31 @@ export async function parsePdfLines(file: File): Promise<string[][]> {
   return rows;
 }
 
-// ---------- yardımcılar ----------
 const NUM = (v: any) => {
   if (v == null || v === "") return 0;
   if (typeof v === "number") return v;
-  const n = parseFloat(String(v).replace(/\s/g, "").replace(/\./g, "").replace(",", "."));
+  const s = String(v).replace(/\s/g, "");
+  const hasComma = s.includes(",");
+  const cleaned = hasComma ? s.replace(/\./g, "").replace(",", ".") : s;
+  const n = parseFloat(cleaned);
   return isNaN(n) ? 0 : n;
 };
 
 const STR = (v: any) => (v == null ? "" : String(v).trim());
 
+function isoDate(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 const DATE = (v: any): string => {
   if (!v && v !== 0) return "";
-  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  if (v instanceof Date) return isoDate(v);
   if (typeof v === "number") {
-    // Excel serial date
     const d = new Date(Math.round((v - 25569) * 86400 * 1000));
-    return isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
+    return isNaN(d.getTime()) ? "" : isoDate(d);
   }
   const s = STR(v);
   const m = s.match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/);
@@ -62,40 +70,52 @@ const DATE = (v: any): string => {
     return `${yr}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`;
   }
   const iso = s.match(/^\d{4}-\d{2}-\d{2}/);
-  return iso ? iso[0] : s;
+  return iso ? iso[0] : "";
 };
 
-/** Başlık adına göre esnek alan seçici. */
-const pick = (row: Row, keys: string[]): any => {
-  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+/** Türkçe karakterleri sadeleştirir, İ→i, boşlukları normalize eder. */
+const norm = (s: string) =>
+  String(s)
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ı/g, "i")
+    .replace(/ş/g, "s")
+    .replace(/ğ/g, "g")
+    .replace(/ü/g, "u")
+    .replace(/ö/g, "o")
+    .replace(/ç/g, "c")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** Uzun (spesifik) anahtar önce; başlıklarda substring araması. */
+function pick(row: Row, keys: string[]): any {
   const rowKeys = Object.keys(row);
-  for (const k of rowKeys) {
-    const nk = norm(k);
-    if (keys.some((x) => nk.includes(norm(x)))) return row[k];
+  const order = [...keys.map(norm)].sort((a, b) => b.length - a.length);
+  for (const k of order) {
+    for (const rk of rowKeys) {
+      if (norm(rk).includes(k)) return row[rk];
+    }
   }
   return "";
-};
+}
 
 // ---------- Faturalar ----------
-// Beklenen sütunlar: FATURA NUMARASI, TARİH, FİRMA,
-//   FATURA TOPLAMI (KDV HARİÇ), KDV TOPLAMI (%10-20),
-//   FATURA İSKONTO, FATURA GENEL TOPLAMI
 export function rowsToInvoices(rows: Row[]): Omit<Invoice, "id">[] {
   return rows.map((r) => {
     const no = STR(pick(r, ["fatura numarasi", "fatura no", "belge no", "invoice"]));
     const date = DATE(pick(r, ["tarih", "date"])) || new Date().toISOString().slice(0, 10);
-    const party = STR(pick(r, ["firma", "musteri", "müşteri", "cari", "tedarikci", "tedarikçi", "unvan", "party", "customer", "supplier"]));
-    const subtotal = NUM(pick(r, ["kdv haric", "kdv hariç", "ara toplam", "matrah"]));
-    const vat = NUM(pick(r, ["kdv toplami", "kdv toplamı", "kdv"]));
-    const discount = NUM(pick(r, ["iskonto", "indirim", "discount"]));
-    let total = NUM(pick(r, ["genel toplam", "grand total"]));
-    if (!total) total = NUM(pick(r, ["toplam", "tutar", "total", "amount"]));
+    const party = STR(pick(r, ["firma", "musteri", "cari", "tedarikci", "unvan", "customer", "supplier"]));
+    const subtotal = NUM(pick(r, ["fatura toplami (kdv haric)", "kdv haric", "ara toplam", "matrah"]));
+    const vat = NUM(pick(r, ["kdv toplami", "kdv toplam", "kdv tutari"]));
+    const discount = NUM(pick(r, ["fatura iskonto", "iskonto", "indirim", "discount"]));
+    let total = NUM(pick(r, ["fatura genel toplami", "genel toplam", "grand total"]));
+    if (!total) total = NUM(pick(r, ["toplam tutar", "toplam", "amount"]));
     if (!total) total = subtotal + vat - discount;
     return {
       no: no || `İMP-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
       date, party, subtotal, vat, discount, total,
       status: "Onaylı" as const,
-      payment: "Bekliyor" as const,
     };
   }).filter((x) => x.party || x.total);
 }
@@ -116,36 +136,45 @@ export function linesToInvoices(lines: string[][]): Omit<Invoice, "id">[] {
       party: party || "—",
       total: amount,
       status: "Onaylı" as const,
-      payment: "Bekliyor" as const,
     });
   }
   return out;
 }
 
 // ---------- Ürünler ----------
-// Beklenen sütunlar: Ürün Adı, Stok Kodu, Barkod, Kategori
+// Katalog Excel: picture1Path, label, brand, stockCode, barcode, mainCategory, price1, tax
 export function rowsToProducts(rows: Row[]): Omit<Product, "id">[] {
-  return rows.map((r) => ({
-    name: STR(pick(r, ["urun adi", "ürün adı", "ad", "name", "title"])),
-    sku: STR(pick(r, ["stok kodu", "stok", "sku", "kod", "code"])),
-    barcode: STR(pick(r, ["barkod", "barcode", "ean", "gtin"])),
-    category: STR(pick(r, ["kategori", "category"])),
-    brand: "",
-    buy: 0, sell: 0, vat: 20, stock: 0, minStock: 0,
-  })).filter((p) => p.name || p.sku || p.barcode);
+  return rows.map((r) => {
+    const price1 = NUM(pick(r, ["price1", "toptan fiyat", "fiyat"]));
+    const tax = NUM(pick(r, ["tax", "kdv orani", "kdv"])) || 20;
+    const sell = +(price1 * (1 + tax / 100)).toFixed(2);
+    return {
+      name: STR(pick(r, ["label", "urun adi", "ad", "name", "title"])),
+      sku: STR(pick(r, ["stockcode", "stok kodu", "sku", "kod", "code"])),
+      barcode: STR(pick(r, ["barcode", "barkod", "ean", "gtin"])),
+      category: STR(pick(r, ["maincategory", "kategori", "category"])),
+      brand: STR(pick(r, ["brand", "marka"])),
+      image: STR(pick(r, ["picture1path", "resim", "image", "gorsel"])),
+      price1, tax, sell,
+      buy: NUM(pick(r, ["buyingprice", "alis"])),
+      vat: tax,
+      stock: NUM(pick(r, ["stockamount", "stok"])),
+      minStock: 0,
+    };
+  }).filter((p) => p.name || p.sku || p.barcode);
 }
 
 // ---------- Banka hareketleri ----------
 export function rowsToBankTx(rows: Row[], bankId: string): Omit<BankTx, "id">[] {
   return rows.map((r) => {
-    const dep = NUM(pick(r, ["giris", "giriş", "alacak", "credit", "in"]));
-    const wit = NUM(pick(r, ["cikis", "çıkış", "borc", "borç", "debit", "out"]));
+    const dep = NUM(pick(r, ["giris", "alacak", "credit", "in"]));
+    const wit = NUM(pick(r, ["cikis", "borc", "debit", "out"]));
     const combined = NUM(pick(r, ["tutar", "amount"]));
     const amount = dep - wit || combined;
     return {
       bankId,
       date: DATE(pick(r, ["tarih", "date"])) || new Date().toISOString().slice(0, 10),
-      description: STR(pick(r, ["aciklama", "açıklama", "desc", "description"])) || "İçe aktarıldı",
+      description: STR(pick(r, ["aciklama", "desc", "description"])) || "İçe aktarıldı",
       category: STR(pick(r, ["kategori", "category"])) || undefined,
       amount,
     };
@@ -170,7 +199,6 @@ export function linesToBankTx(lines: string[][], bankId: string): Omit<BankTx, "
   return out;
 }
 
-// ---------- Şablon indir ----------
 export function downloadTemplate(name: string, headers: string[], sample: any[][] = []) {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([headers, ...sample]);
@@ -188,4 +216,6 @@ export const INVOICE_TEMPLATE_HEADERS = [
   "FATURA GENEL TOPLAMI",
 ];
 
-export const PRODUCT_TEMPLATE_HEADERS = ["Ürün Adı", "Stok Kodu", "Barkod", "Kategori"];
+export const PRODUCT_TEMPLATE_HEADERS = [
+  "picture1Path", "label", "brand", "stockCode", "barcode", "mainCategory", "price1", "tax",
+];

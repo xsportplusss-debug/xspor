@@ -18,6 +18,7 @@ import {
   Bell,
   UserCog,
   Building2,
+  FileSignature,
   Sparkles,
 } from "lucide-react";
 import {
@@ -45,6 +46,7 @@ const mainItems = [
 const salesItems = [
   { title: "Satış Faturaları", url: "/satis-faturalari", icon: FileText },
   { title: "Alış Faturaları", url: "/alis-faturalari", icon: ShoppingCart },
+  { title: "Fiyat Teklifi", url: "/fiyat-teklifi", icon: FileSignature },
   { title: "E-Arşiv", url: "/e-arsiv", icon: Archive },
 ];
 
