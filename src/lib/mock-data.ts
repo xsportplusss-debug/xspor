@@ -63,6 +63,12 @@ export type Bank = {
   balance: number; // açılış bakiyesi
   color: string;
   active?: boolean; // pasif yapıldıysa false
+  accountName?: string;
+  branchName?: string;
+  branchCode?: string;
+  accountNumber?: string;
+  openingDate?: string;
+  description?: string;
 };
 
 
