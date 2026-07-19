@@ -47,7 +47,7 @@ function Page() {
   const updateBank = useStore((s) => s.updateBank);
   const bulkAddBankTx = useStore((s) => s.bulkAddBankTx);
   const addBankImport = useStore((s) => s.addBankImport);
-  const [seeding, setSeeding] = useState(false);
+  const bulkRemoveBankTx = useStore((s) => s.bulkRemoveBankTx);
 
   const metrics = useMemo(() => {
     const todayStr = new Date().toISOString().slice(0, 10);
