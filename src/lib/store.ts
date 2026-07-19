@@ -4,6 +4,39 @@ import type { Invoice, Cari, Product, Bank, BankTx, CashRegister, CashTx, Catego
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
+export type EInvoiceConfig = {
+  apiUrl: string;
+  username: string;
+  password: string;
+  companyCode: string;
+  token: string;
+  provider: string; // GİB veya entegratör adı
+};
+
+export type MarketplaceConfig = {
+  apiUrl: string;
+  apiKey: string;
+  apiSecret: string;
+  merchantId: string;
+  token: string;
+  connected: boolean;
+  lastSync?: string;
+};
+
+export type MarketplaceOrder = {
+  id: string;
+  marketplace: string; // trendyol, hepsiburada, ...
+  orderNo: string;
+  date: string;
+  customer: string;
+  amount: number;   // sipariş tutarı (KDV dahil)
+  vat: number;
+  shipping: number;
+  commission: number;
+  net: number;      // net kazanç
+  status: "Yeni" | "Hazırlanıyor" | "Kargo" | "Tamamlandı" | "İade";
+};
+
 type State = {
   salesInvoices: Invoice[];
   purchaseInvoices: Invoice[];
@@ -14,7 +47,12 @@ type State = {
   bankTx: BankTx[];
   cashRegisters: CashRegister[];
   cashTx: CashTx[];
+  eInvoiceConfig: EInvoiceConfig | null;
+  eInvoiceLastSync: string | null;
+  marketplaceConfigs: Record<string, MarketplaceConfig>;
+  marketplaceOrders: MarketplaceOrder[];
 };
+
 
 type Actions = {
   // sales
