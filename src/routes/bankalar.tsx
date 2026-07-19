@@ -93,7 +93,7 @@ function Page() {
         );
         const fresh = txs.filter((x) => !existingKeys.has(dedupKey(x)));
         const importId = addBankImport({
-          bankId: bank.id, fileName: file.name, fileType: "excel",
+          bankId: bank.id, fileName: file.name, fileType: "xlsx",
           total: txs.length, success: fresh.length, failed: txs.length - fresh.length,
         });
         bulkAddBankTx(fresh.map((x) => ({ ...x, importId })));
