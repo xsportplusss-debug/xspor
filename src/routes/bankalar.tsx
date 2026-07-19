@@ -7,11 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Landmark, Plus, Power, Trash2, Sparkles, Pencil } from "lucide-react";
+import { Landmark, Plus, Power, Trash2, Pencil, Eraser, ListOrdered } from "lucide-react";
 import { useMemo, useState } from "react";
-import { parseExcel, rowsToBankTx } from "@/lib/importers";
 import { toast } from "sonner";
 import { fmt, type Bank } from "@/lib/mock-data";
 import { useStore, bankBalance } from "@/lib/store";
@@ -31,13 +30,6 @@ export const Route = createFileRoute("/bankalar")({
 const COLORS = ["#00A651", "#0055A4", "#004990", "#E30613", "#7B2CBF", "#F27A1A"];
 const CURRENCIES = ["TRY", "USD", "EUR", "GBP", "CHF"];
 
-const dedupKey = (t: { date: string; description: string; amount: number; refNo?: string }) =>
-  `${t.date}|${t.refNo || ""}|${t.description.trim().toLowerCase()}|${t.amount.toFixed(2)}`;
-
-const SAMPLES: { file: string; name: string; short: string; color: string }[] = [
-  { file: "/samples/halk-bankasi.xlsx", name: "Halk Bankası", short: "HALK", color: "#E30613" },
-  { file: "/samples/vakif-bank.xlsx", name: "Vakıfbank", short: "VKF", color: "#F27A1A" },
-];
 
 type FormState = Omit<Bank, "id">;
 
@@ -55,7 +47,7 @@ function Page() {
   const updateBank = useStore((s) => s.updateBank);
   const bulkAddBankTx = useStore((s) => s.bulkAddBankTx);
   const addBankImport = useStore((s) => s.addBankImport);
-  const [seeding, setSeeding] = useState(false);
+  const bulkRemoveBankTx = useStore((s) => s.bulkRemoveBankTx);
 
   const metrics = useMemo(() => {
     const todayStr = new Date().toISOString().slice(0, 10);
@@ -106,41 +98,12 @@ function Page() {
     if (confirm(`${b.name} silinsin mi?`)) removeBank(b.id);
   };
 
-  const seedSamples = async () => {
-    setSeeding(true);
-    try {
-      let totalNew = 0;
-      for (const s of SAMPLES) {
-        let bank = banks.find((b) => b.name.toLowerCase() === s.name.toLowerCase());
-        if (!bank) {
-          addBank({ ...emptyForm, name: s.name, short: s.short, color: s.color });
-          bank = useStore.getState().banks.find((b) => b.name.toLowerCase() === s.name.toLowerCase());
-        }
-        if (!bank) continue;
-        const res = await fetch(s.file);
-        if (!res.ok) { toast.error(`${s.name} dosyası bulunamadı`); continue; }
-        const blob = await res.blob();
-        const file = new File([blob], s.file.split("/").pop()!, { type: blob.type });
-        const rows = await parseExcel(file);
-        const txs = rowsToBankTx(rows, bank.id);
-        const existingKeys = new Set(
-          useStore.getState().bankTx.filter((t) => t.bankId === bank!.id).map(dedupKey),
-        );
-        const fresh = txs.filter((x) => !existingKeys.has(dedupKey(x)));
-        const importId = addBankImport({
-          bankId: bank.id, fileName: file.name, fileType: "xlsx",
-          total: txs.length, success: fresh.length, failed: txs.length - fresh.length,
-          importedAt: new Date().toISOString(),
-        });
-        bulkAddBankTx(fresh.map((x) => ({ ...x, importId })));
-        totalNew += fresh.length;
-      }
-      toast.success(`${totalNew} hareket yüklendi`, { description: "Halk Bankası + Vakıfbank" });
-    } catch (e: any) {
-      toast.error("Yükleme başarısız", { description: e.message });
-    } finally {
-      setSeeding(false);
-    }
+  const clearBankTx = (b: Bank) => {
+    const ids = bankTx.filter((t) => t.bankId === b.id).map((t) => t.id);
+    if (ids.length === 0) return toast.info("Bu bankada hareket yok");
+    if (!confirm(`${b.name} — ${ids.length} hareketin tamamı silinsin mi?`)) return;
+    bulkRemoveBankTx(ids);
+    toast.success(`${ids.length} hareket silindi`);
   };
 
   return (
@@ -149,14 +112,10 @@ function Page() {
         title="Bankalar"
         subtitle={`${banks.length} hesap`}
         actions={
-          <>
-            <Button size="sm" variant="outline" onClick={seedSamples} disabled={seeding}>
-              <Sparkles className="mr-1 h-4 w-4" /> {seeding ? "Yükleniyor…" : "Örnek Ekstreleri Yükle"}
-            </Button>
-            <Button size="sm" className="gradient-primary text-primary-foreground shadow-elegant" onClick={openNew}>
-              <Plus className="mr-1 h-4 w-4" /> Yeni Banka Ekle
-            </Button>
-          </>
+          <Button size="sm" className="gradient-primary text-primary-foreground shadow-elegant" onClick={openNew}>
+            <Plus className="mr-1 h-4 w-4" /> Yeni Banka Ekle
+          </Button>
+        
         }
       />
 
@@ -241,7 +200,10 @@ function Page() {
                         onClick={() => updateBank(b.id, { active: !active })}>
                         <Power className={`h-4 w-4 ${active ? "text-success" : "text-muted-foreground"}`} />
                       </Button>
-                      <Button variant="ghost" size="icon" title="Sil" onClick={() => tryRemove(b)}>
+                      <Button variant="ghost" size="icon" title="Hareketleri Sil" onClick={() => clearBankTx(b)}>
+                        <Eraser className="h-4 w-4 text-warning" />
+                      </Button>
+                      <Button variant="ghost" size="icon" title="Bankayı Sil" onClick={() => tryRemove(b)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
@@ -280,7 +242,9 @@ function Page() {
                     <span>{mm.count} hareket</span>
                   </div>
                   <Link to="/bankalar/$id" params={{ id: b.id }}>
-                    <Button variant="outline" size="sm" className="mt-4 w-full">Hareketler</Button>
+                    <Button size="sm" className="mt-4 w-full gradient-primary text-primary-foreground">
+                      <ListOrdered className="mr-1 h-4 w-4" /> Hareketleri Gör ({mm.count})
+                    </Button>
                   </Link>
                 </CardContent>
               </Card>
