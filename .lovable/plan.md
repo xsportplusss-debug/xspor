@@ -1,39 +1,54 @@
 
-# Bulut Senkron Planı
+# Fintra Genişletme Planı
 
-Tüm verileri Lovable Cloud'a taşıyıp e-posta/şifre girişi ile korumak. Böylece hangi cihazdan girerseniz girin aynı veriyi görürsünüz.
+Mevcut sistem korunacak. Hiçbir tablo, route veya store alanı silinmeyecek. Tüm yenilikler **modüler** ve **ek** olarak gelecek. Gerçek API bağlantıları şimdilik yok — servis katmanı hazır, mock ile çalışır, ileride kolayca gerçek API'ye bağlanır.
 
-## 1. Altyapı
-- **Lovable Cloud etkinleştir** (Supabase tabanlı — sizden ek hesap istemez).
-- E-posta + şifre girişi (`/auth` sayfası — kayıt + giriş + çıkış). "Tek kullanıcı" tercihiniz gereği yeni kayıtları kapatma seçeneği: ilk kayıttan sonra kayıt formu gizlenir; sadece siz girersiniz.
-- `_authenticated` layout (mevcut şablon otomatik gelir) — tüm sayfalar giriş gerektirir.
+## 1. Servis Katmanı (yeni)
+- `src/services/e-invoice/` — E-Fatura servisi (mock adapter + interface)
+- `src/services/marketplaces/` — her pazaryeri için ayrı adapter (Trendyol, Hepsiburada, N11, Amazon, Pazarama, ÇiçekSepeti, PTTAVM, idefix, Turkcell Pasaj) — ortak `MarketplaceAdapter` arayüzü
+- Gelecekte gerçek `fetch` çağrıları bu dosyalara eklenecek.
 
-## 2. Veritabanı tabloları (her tabloda `user_id` + RLS "sadece kendi verin")
-- `sales_invoices`, `purchase_invoices`
-- `cari` (müşteriler)
-- `products`, `categories`
-- `banks`, `bank_tx`
-- `cash_registers`, `cash_tx`
-- `company_settings` (firma bilgileri + logo)
-- `quotes` (fiyat teklifleri — kaydet/önizle özelliği için)
+## 2. Store Genişletmeleri (kırılmadan)
+`src/lib/store.ts` içine yeni alanlar eklenir, eskiler dokunulmaz:
+- `eInvoiceConfig`, `eInvoiceLastSync`
+- `marketplaceConfigs: Record<string, {...}>`
+- `marketplaceOrders: MarketplaceOrder[]`
+- `cashTx.category` (opsiyonel yeni alan)
+- `banks.active` (opsiyonel — pasif/aktif)
+- Invoice tipine opsiyonel `source: "manual" | "e-invoice"` + `uuid` (duplicate kontrolü)
 
-## 3. Kod tarafı
-- Mevcut Zustand store'u **server function**'lara çevrilecek — her CRUD Supabase'e yazar, TanStack Query ile cache/invalidate.
-- **Otomatik migrasyon**: giriş yapınca `localStorage`'daki `fintra:v1` verisi bulutta boşsa tek seferlik yüklenir, sonra flag ile devre dışı.
-- Firma logosu Cloud Storage'a yüklenir → URL DB'de saklanır.
-- Fiyat Teklifi: "Kaydet" ve "Önizleme" butonları — kayıtlı teklifleri listeden açıp düzenleyebilirsiniz.
+## 3. Yeni Rotalar
+- `/e-fatura-entegrasyon` — Config formu, "Bağlantıyı Test Et", "Faturaları Çek", son senkron tarihi
+- `/pazaryerleri/ayarlar` — Her pazaryeri için API config kartı, "Bağlı" rozeti, "Siparişleri Çek"
+- Mevcut pazaryeri sayfalarına yeni pazaryerleri eklenir (ÇiçekSepeti, PTTAVM, idefix, Turkcell Pasaj) — mevcutlar aynı kalır
 
-## 4. Kapsam
-- ✅ Tüm liste sayfaları (faturalar, cari, ürünler, bankalar, kasa, teklifler) buluttan okuyacak.
-- ✅ Excel/PDF/XML import bulut kayıtları oluşturacak.
-- ✅ Telefon + masaüstü aynı anda güncel — bir cihazda ekleyince diğerinde 1-2 sn'de görünür.
-- ❌ Gerçek zamanlı (websocket) push kapsam dışı — sayfa yenilendiğinde/route değişince güncel; istersen ekleriz.
-- ❌ xsportplus.com.tr'ye gömme (iframe/subdomain) ayrı bir iş — panel kendi URL'sinde kalır.
+## 4. Modül İyileştirmeleri
+- **Bankalar**: Pasif yap, Düzenle, kartta Toplam Gelen/Giden/Son Hareket/Adet. CSV import eklenir (Excel/PDF zaten var).
+- **Ürünler**: Kur alanı UI'dan kaldırılır (mevcut veriler bozulmaz, alan opsiyonel kalır). Yeni Ürün formu sadeleşir.
+- **Fiyat Teklifi**: Para birimi seçimi USD/EUR/GBP/TL genişletilir, kur teklif özelinde çalışır (zaten benzer, GBP eklenir).
+- **Kasa**: Nakit Giriş/Çıkış dialoglarına kategori seçici (Yemek, Yakıt, Kargo, Market, Personel, Ofis, Reklam, Diğer).
+- **Gelirler / Giderler**: Mevcut sayfalar zenginleştirilir — kaynak filtresi (Banka/Kasa/Pazaryeri/Diğer), kategori renk kodları, toplam kart.
+- **Dashboard**: Yeni kartlar (Bugünkü Ciro/Tahsilat/Gider, Bekleyen Tahsilat/Borç, Pazaryeri Siparişleri, Net Kâr, E-Fatura yeşil rozet).
 
-## Teknik notlar
-- Auth: Supabase Auth (email+password).
-- Data API: TanStack `createServerFn` + `requireSupabaseAuth`; RLS `auth.uid() = user_id`.
-- Cache: TanStack Query, mutation sonrası `invalidateQueries`.
-- Şema değişikliği migration'ları Lovable Cloud üzerinden.
+## 5. Entegrasyon
+- Pazaryeri siparişleri çekildiğinde otomatik `bankTx` benzeri hareket + `marketplaceOrders` kaydı → Gelir/Gider/Dashboard otomatik yansır.
+- E-Fatura çekimi → mevcut `salesInvoices`/`purchaseInvoices` içine UUID/no bazlı duplicate check ile eklenir, `source: "e-invoice"` etiketi.
+- Kasa/Banka hareketleri zaten Gelir/Gider'e yansıyor; kategori bilgisi de aktarılır.
 
-Onaylarsan Lovable Cloud'u açıp inşaya başlıyorum.
+## 6. Dokunulmayacaklar
+- Supabase şeması (user_data JSON blob — genişleme otomatik)
+- Auth akışı, Drive yedek, mevcut Excel/PDF importerlar
+- Mevcut route yolları ve isimleri
+- localStorage anahtarı `fintra:v1`
+
+## Uygulama Sırası
+1. Store + tip genişletmeleri
+2. Servis katmanı iskeleti (mock)
+3. E-Fatura rotası
+4. Pazaryeri config rotası + yeni pazaryeri sayfaları
+5. Kasa kategori, Ürünler UI sadeleştirme, GBP
+6. Bankalar kart metrikleri + pasif
+7. Gelir/Gider zenginleştirme
+8. Dashboard yeni kartlar
+
+Onaylarsan sırayla uygulamaya başlıyorum.
