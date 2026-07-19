@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Invoice, Cari, Product, Bank, BankTx, CashRegister, CashTx, Category } from "./mock-data";
+import type { Invoice, Cari, Product, Bank, BankTx, CashRegister, CashTx, Category, BankImportRecord } from "./mock-data";
+
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
@@ -47,8 +48,10 @@ type State = {
   bankTx: BankTx[];
   cashRegisters: CashRegister[];
   cashTx: CashTx[];
+  bankImports: BankImportRecord[];
   eInvoiceConfig: EInvoiceConfig | null;
   eInvoiceLastSync: string | null;
+
   marketplaceConfigs: Record<string, MarketplaceConfig>;
   marketplaceOrders: MarketplaceOrder[];
 };
@@ -111,6 +114,8 @@ type Actions = {
   removeMarketplaceOrders: (marketplace: string) => void;
   // banks extra
   updateBank: (id: string, patch: Partial<Bank>) => void;
+  addBankImport: (v: Omit<BankImportRecord, "id">) => string;
+  removeBankImport: (id: string) => void;
   // meta
   resetAll: () => void;
 };
@@ -125,10 +130,12 @@ const initial: State = {
   bankTx: [],
   cashRegisters: [],
   cashTx: [],
+  bankImports: [],
   eInvoiceConfig: null,
   eInvoiceLastSync: null,
   marketplaceConfigs: {},
   marketplaceOrders: [],
+
 };
 
 
@@ -232,6 +239,16 @@ export const useStore = create<State & Actions>()(
       })),
 
       updateBank: (id, patch) => set((s) => ({ banks: s.banks.map((x) => x.id === id ? { ...x, ...patch } : x) })),
+      addBankImport: (v) => {
+        const id = uid();
+        set((s) => ({ bankImports: [{ ...v, id }, ...s.bankImports] }));
+        return id;
+      },
+      removeBankImport: (id) => set((s) => ({
+        bankImports: s.bankImports.filter((x) => x.id !== id),
+        bankTx: s.bankTx.filter((t) => t.importId !== id),
+      })),
+
 
       resetAll: () => set(() => ({ ...initial })),
 
