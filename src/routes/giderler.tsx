@@ -102,7 +102,7 @@ function Page() {
                 {filtered.map((r) => (
                   <TableRow key={r.kind + r.id}>
                     <TableCell className="text-muted-foreground">{r.date}</TableCell>
-                    <TableCell><Badge variant="secondary">{r.kind}</Badge> <span className="ml-1 text-xs text-muted-foreground">{r.source}</span></TableCell>
+                    <TableCell><span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${kindColor(r.kind)}`}>{r.kind}</span> <span className="ml-1 text-xs text-muted-foreground">{r.source}</span></TableCell>
                     <TableCell>{r.description}</TableCell>
                     <TableCell className="text-muted-foreground">{r.category}</TableCell>
                     <TableCell className="text-right font-semibold text-destructive">{fmtTL(r.amount)}</TableCell>
