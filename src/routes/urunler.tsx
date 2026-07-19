@@ -230,7 +230,7 @@ function Page() {
   );
 }
 
-function ProductForm({ value, onChange, rates }: { value: any; onChange: (v: any) => void; rates: { USD: number; EUR: number } }) {
+function ProductForm({ value, onChange, rates }: { value: any; onChange: (v: any) => void; rates: { USD: number; EUR: number; GBP: number } }) {
   const set = (patch: any) => onChange({ ...value, ...patch });
   const tl = value.currency === "TRY" ? value.price1 : value.price1 * (value.currency === "USD" ? rates.USD : value.currency === "EUR" ? rates.EUR : rates.GBP);
   const kdvDahil = +(tl * (1 + value.tax / 100)).toFixed(2);
