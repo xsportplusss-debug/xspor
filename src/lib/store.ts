@@ -48,8 +48,10 @@ type State = {
   bankTx: BankTx[];
   cashRegisters: CashRegister[];
   cashTx: CashTx[];
+  bankImports: BankImportRecord[];
   eInvoiceConfig: EInvoiceConfig | null;
   eInvoiceLastSync: string | null;
+
   marketplaceConfigs: Record<string, MarketplaceConfig>;
   marketplaceOrders: MarketplaceOrder[];
 };
