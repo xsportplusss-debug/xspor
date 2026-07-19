@@ -29,12 +29,23 @@ export const Route = createFileRoute("/bankalar")({
 
 const COLORS = ["#00A651", "#0055A4", "#004990", "#E30613", "#7B2CBF", "#F27A1A"];
 
+const dedupKey = (t: { date: string; description: string; amount: number; refNo?: string }) =>
+  `${t.date}|${t.refNo || ""}|${t.description.trim().toLowerCase()}|${t.amount.toFixed(2)}`;
+
+const SAMPLES: { file: string; name: string; short: string; color: string }[] = [
+  { file: "/samples/halk-bankasi.xlsx", name: "Halk Bankası", short: "HALK", color: "#E30613" },
+  { file: "/samples/vakif-bank.xlsx", name: "Vakıfbank", short: "VKF", color: "#F27A1A" },
+];
+
 function Page() {
   const banks = useStore((s) => s.banks);
   const bankTx = useStore((s) => s.bankTx);
   const addBank = useStore((s) => s.addBank);
   const removeBank = useStore((s) => s.removeBank);
   const updateBank = useStore((s) => s.updateBank);
+  const bulkAddBankTx = useStore((s) => s.bulkAddBankTx);
+  const addBankImport = useStore((s) => s.addBankImport);
+  const [seeding, setSeeding] = useState(false);
 
   const metrics = useMemo(() => {
     const m: Record<string, { in: number; out: number; last: string; count: number }> = {};
@@ -59,6 +70,43 @@ function Page() {
     setForm({ name: "", short: "", iban: "", currency: "TRY", balance: 0, color: COLORS[0] });
     toast.success("Banka eklendi");
   };
+
+  const seedSamples = async () => {
+    setSeeding(true);
+    try {
+      let totalNew = 0;
+      for (const s of SAMPLES) {
+        let bank = banks.find((b) => b.name.toLowerCase() === s.name.toLowerCase());
+        if (!bank) {
+          addBank({ name: s.name, short: s.short, iban: "", currency: "TRY", balance: 0, color: s.color });
+          bank = useStore.getState().banks.find((b) => b.name.toLowerCase() === s.name.toLowerCase());
+        }
+        if (!bank) continue;
+        const res = await fetch(s.file);
+        if (!res.ok) { toast.error(`${s.name} dosyası bulunamadı`); continue; }
+        const blob = await res.blob();
+        const file = new File([blob], s.file.split("/").pop()!, { type: blob.type });
+        const rows = await parseExcel(file);
+        const txs = rowsToBankTx(rows, bank.id);
+        const existingKeys = new Set(
+          useStore.getState().bankTx.filter((t) => t.bankId === bank!.id).map(dedupKey),
+        );
+        const fresh = txs.filter((x) => !existingKeys.has(dedupKey(x)));
+        const importId = addBankImport({
+          bankId: bank.id, fileName: file.name, fileType: "excel",
+          total: txs.length, success: fresh.length, failed: txs.length - fresh.length,
+        });
+        bulkAddBankTx(fresh.map((x) => ({ ...x, importId })));
+        totalNew += fresh.length;
+      }
+      toast.success(`${totalNew} hareket yüklendi`, { description: "Halk Bankası + Vakıfbank" });
+    } catch (e: any) {
+      toast.error("Yükleme başarısız", { description: e.message });
+    } finally {
+      setSeeding(false);
+    }
+  };
+
 
   return (
     <div className="space-y-6">
