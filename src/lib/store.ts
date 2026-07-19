@@ -202,7 +202,39 @@ export const useStore = create<State & Actions>()(
       removeCashTx: (id) => set((s) => ({ cashTx: s.cashTx.filter((x) => x.id !== id) })),
       bulkRemoveCashTx: (ids) => set((s) => ({ cashTx: s.cashTx.filter((x) => !ids.includes(x.id)) })),
 
+      setEInvoiceConfig: (c) => set(() => ({ eInvoiceConfig: c })),
+      setEInvoiceLastSync: (iso) => set(() => ({ eInvoiceLastSync: iso })),
+
+      setMarketplaceConfig: (id, c) => set((s) => ({ marketplaceConfigs: { ...s.marketplaceConfigs, [id]: c } })),
+      removeMarketplaceConfig: (id) => set((s) => {
+        const cfg = { ...s.marketplaceConfigs };
+        delete cfg[id];
+        return { marketplaceConfigs: cfg };
+      }),
+      addMarketplaceOrders: (list) => {
+        let added = 0;
+        set((s) => {
+          const existing = new Set(s.marketplaceOrders.map((o) => `${o.marketplace}:${o.orderNo}`));
+          const fresh: MarketplaceOrder[] = [];
+          for (const o of list) {
+            const key = `${o.marketplace}:${o.orderNo}`;
+            if (existing.has(key)) continue;
+            existing.add(key);
+            fresh.push({ ...o, id: uid() });
+            added++;
+          }
+          return { marketplaceOrders: [...fresh, ...s.marketplaceOrders] };
+        });
+        return added;
+      },
+      removeMarketplaceOrders: (marketplace) => set((s) => ({
+        marketplaceOrders: s.marketplaceOrders.filter((o) => o.marketplace !== marketplace),
+      })),
+
+      updateBank: (id, patch) => set((s) => ({ banks: s.banks.map((x) => x.id === id ? { ...x, ...patch } : x) })),
+
       resetAll: () => set(() => ({ ...initial })),
+
     }),
     { name: "fintra:v1" },
   ),
