@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
-import { Landmark, Plus, Power, Trash2 } from "lucide-react";
+import { Landmark, Plus, Power, Trash2, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
+import { parseExcel, rowsToBankTx } from "@/lib/importers";
 import { toast } from "sonner";
 import { fmt } from "@/lib/mock-data";
 import { useStore, bankBalance } from "@/lib/store";
