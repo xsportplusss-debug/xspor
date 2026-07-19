@@ -4,18 +4,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
-import { Landmark, Plus, Power, Trash2, Sparkles } from "lucide-react";
+import { Landmark, Plus, Power, Trash2, Sparkles, Pencil } from "lucide-react";
 import { useMemo, useState } from "react";
 import { parseExcel, rowsToBankTx } from "@/lib/importers";
 import { toast } from "sonner";
-import { fmt } from "@/lib/mock-data";
+import { fmt, type Bank } from "@/lib/mock-data";
 import { useStore, bankBalance } from "@/lib/store";
 import { EmptyState } from "@/components/empty-state";
 import { Badge } from "@/components/ui/badge";
-
 
 export const Route = createFileRoute("/bankalar")({
   head: () => ({
@@ -28,6 +29,7 @@ export const Route = createFileRoute("/bankalar")({
 });
 
 const COLORS = ["#00A651", "#0055A4", "#004990", "#E30613", "#7B2CBF", "#F27A1A"];
+const CURRENCIES = ["TRY", "USD", "EUR", "GBP", "CHF"];
 
 const dedupKey = (t: { date: string; description: string; amount: number; refNo?: string }) =>
   `${t.date}|${t.refNo || ""}|${t.description.trim().toLowerCase()}|${t.amount.toFixed(2)}`;
@@ -36,6 +38,14 @@ const SAMPLES: { file: string; name: string; short: string; color: string }[] = 
   { file: "/samples/halk-bankasi.xlsx", name: "Halk Bankası", short: "HALK", color: "#E30613" },
   { file: "/samples/vakif-bank.xlsx", name: "Vakıfbank", short: "VKF", color: "#F27A1A" },
 ];
+
+type FormState = Omit<Bank, "id">;
+
+const emptyForm: FormState = {
+  name: "", short: "", iban: "", currency: "TRY", balance: 0, color: COLORS[0], active: true,
+  accountName: "", branchName: "", branchCode: "", accountNumber: "",
+  openingDate: new Date().toISOString().slice(0, 10), description: "",
+};
 
 function Page() {
   const banks = useStore((s) => s.banks);
@@ -48,27 +58,52 @@ function Page() {
   const [seeding, setSeeding] = useState(false);
 
   const metrics = useMemo(() => {
-    const m: Record<string, { in: number; out: number; last: string; count: number }> = {};
-    for (const b of banks) m[b.id] = { in: 0, out: 0, last: "", count: 0 };
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const monthStr = todayStr.slice(0, 7);
+    const m: Record<string, { in: number; out: number; todayIn: number; todayOut: number; monthIn: number; monthOut: number; last: string; count: number }> = {};
+    for (const b of banks) m[b.id] = { in: 0, out: 0, todayIn: 0, todayOut: 0, monthIn: 0, monthOut: 0, last: "", count: 0 };
     for (const t of bankTx) {
       const x = m[t.bankId]; if (!x) continue;
       x.count++;
-      if (t.amount >= 0) x.in += t.amount; else x.out += -t.amount;
+      const isIn = t.amount >= 0;
+      const abs = Math.abs(t.amount);
+      if (isIn) x.in += abs; else x.out += abs;
+      if (t.date === todayStr) { if (isIn) x.todayIn += abs; else x.todayOut += abs; }
+      if (t.date.startsWith(monthStr)) { if (isIn) x.monthIn += abs; else x.monthOut += abs; }
       if (!x.last || t.date > x.last) x.last = t.date;
     }
     return m;
   }, [banks, bankTx]);
 
-
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", short: "", iban: "", currency: "TRY", balance: 0, color: COLORS[0] });
+  const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState<FormState>(emptyForm);
+
+  const openNew = () => { setEditId(null); setForm(emptyForm); setOpen(true); };
+  const openEdit = (b: Bank) => {
+    setEditId(b.id);
+    setForm({ ...emptyForm, ...b });
+    setOpen(true);
+  };
 
   const save = () => {
-    if (!form.name) return toast.error("Banka adı girin");
-    addBank(form);
+    if (!form.name.trim()) return toast.error("Banka adı girin");
+    if (editId) {
+      updateBank(editId, form);
+      toast.success("Banka güncellendi");
+    } else {
+      addBank(form);
+      toast.success("Banka eklendi");
+    }
     setOpen(false);
-    setForm({ name: "", short: "", iban: "", currency: "TRY", balance: 0, color: COLORS[0] });
-    toast.success("Banka eklendi");
+    setEditId(null);
+    setForm(emptyForm);
+  };
+
+  const tryRemove = (b: Bank) => {
+    const hasTx = bankTx.some((t) => t.bankId === b.id);
+    if (hasTx) return toast.error("Bu bankada hareket var — önce hareketleri silmelisiniz");
+    if (confirm(`${b.name} silinsin mi?`)) removeBank(b.id);
   };
 
   const seedSamples = async () => {
@@ -78,7 +113,7 @@ function Page() {
       for (const s of SAMPLES) {
         let bank = banks.find((b) => b.name.toLowerCase() === s.name.toLowerCase());
         if (!bank) {
-          addBank({ name: s.name, short: s.short, iban: "", currency: "TRY", balance: 0, color: s.color });
+          addBank({ ...emptyForm, name: s.name, short: s.short, color: s.color });
           bank = useStore.getState().banks.find((b) => b.name.toLowerCase() === s.name.toLowerCase());
         }
         if (!bank) continue;
@@ -108,7 +143,6 @@ function Page() {
     }
   };
 
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -116,47 +150,72 @@ function Page() {
         subtitle={`${banks.length} hesap`}
         actions={
           <>
-          <Button size="sm" variant="outline" onClick={seedSamples} disabled={seeding}>
-            <Sparkles className="mr-1 h-4 w-4" /> {seeding ? "Yükleniyor…" : "Örnek Ekstreleri Yükle"}
-          </Button>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="gradient-primary text-primary-foreground shadow-elegant">
-                <Plus className="mr-1 h-4 w-4" /> Yeni Hesap
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Yeni Banka Hesabı</DialogTitle></DialogHeader>
-              <div className="grid gap-3">
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="col-span-2"><Label>Ad</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-                  <div><Label>Kısaltma</Label><Input value={form.short} onChange={(e) => setForm({ ...form, short: e.target.value.toUpperCase() })} /></div>
-                </div>
-                <div><Label>IBAN</Label><Input value={form.iban} onChange={(e) => setForm({ ...form, iban: e.target.value })} /></div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div><Label>Para Birimi</Label><Input value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })} /></div>
-                  <div><Label>Açılış Bakiyesi</Label><Input type="number" value={form.balance} onChange={(e) => setForm({ ...form, balance: +e.target.value })} /></div>
-                </div>
-                <div>
-                  <Label>Renk</Label>
-                  <div className="mt-1 flex gap-2">
-                    {COLORS.map((c) => (
-                      <button key={c} type="button" onClick={() => setForm({ ...form, color: c })}
-                        className={`h-8 w-8 rounded-lg ring-2 ${form.color === c ? "ring-foreground" : "ring-transparent"}`}
-                        style={{ backgroundColor: c }} />
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setOpen(false)}>İptal</Button>
-                <Button onClick={save} className="gradient-primary text-primary-foreground">Kaydet</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+            <Button size="sm" variant="outline" onClick={seedSamples} disabled={seeding}>
+              <Sparkles className="mr-1 h-4 w-4" /> {seeding ? "Yükleniyor…" : "Örnek Ekstreleri Yükle"}
+            </Button>
+            <Button size="sm" className="gradient-primary text-primary-foreground shadow-elegant" onClick={openNew}>
+              <Plus className="mr-1 h-4 w-4" /> Yeni Banka Ekle
+            </Button>
           </>
         }
       />
+
+      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setEditId(null); setForm(emptyForm); } }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{editId ? "Bankayı Düzenle" : "Yeni Banka Ekle"}</DialogTitle></DialogHeader>
+          <div className="grid gap-3">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-2"><Label>Banka Adı *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+              <div><Label>Kısaltma</Label><Input value={form.short} onChange={(e) => setForm({ ...form, short: e.target.value.toUpperCase() })} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div><Label>Hesap Adı</Label><Input value={form.accountName} onChange={(e) => setForm({ ...form, accountName: e.target.value })} /></div>
+              <div><Label>Hesap Numarası</Label><Input value={form.accountNumber} onChange={(e) => setForm({ ...form, accountNumber: e.target.value })} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div><Label>Şube Adı</Label><Input value={form.branchName} onChange={(e) => setForm({ ...form, branchName: e.target.value })} /></div>
+              <div><Label>Şube Kodu</Label><Input value={form.branchCode} onChange={(e) => setForm({ ...form, branchCode: e.target.value })} /></div>
+            </div>
+            <div><Label>IBAN</Label><Input value={form.iban} onChange={(e) => setForm({ ...form, iban: e.target.value.toUpperCase() })} /></div>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <Label>Para Birimi</Label>
+                <select
+                  className="mt-1 h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                  value={form.currency}
+                  onChange={(e) => setForm({ ...form, currency: e.target.value })}
+                >
+                  {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div><Label>Başlangıç Bakiyesi</Label><Input type="number" value={form.balance} onChange={(e) => setForm({ ...form, balance: +e.target.value })} /></div>
+              <div><Label>Açılış Tarihi</Label><Input type="date" value={form.openingDate} onChange={(e) => setForm({ ...form, openingDate: e.target.value })} /></div>
+            </div>
+            <div><Label>Açıklama</Label><Textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+            <div>
+              <Label>Renk</Label>
+              <div className="mt-1 flex gap-2">
+                {COLORS.map((c) => (
+                  <button key={c} type="button" onClick={() => setForm({ ...form, color: c })}
+                    className={`h-8 w-8 rounded-lg ring-2 ${form.color === c ? "ring-foreground" : "ring-transparent"}`}
+                    style={{ backgroundColor: c }} />
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-md border p-3">
+              <Switch checked={form.active !== false} onCheckedChange={(v) => setForm({ ...form, active: v })} />
+              <div className="text-sm">
+                <div className="font-medium">{form.active !== false ? "Aktif" : "Pasif"}</div>
+                <div className="text-xs text-muted-foreground">Pasif hesaplar listede soluk görünür.</div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>İptal</Button>
+            <Button onClick={save} className="gradient-primary text-primary-foreground">Kaydet</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {banks.length === 0 ? (
         <EmptyState icon={Landmark} title="Henüz banka hesabı yok" desc="Yeni hesap ekleyin, ardından hareket girin veya ekstre içe aktarın." />
@@ -166,50 +225,67 @@ function Page() {
             const active = b.active !== false;
             const mm = metrics[b.id];
             return (
-            <Card key={b.id} className={`glass overflow-hidden ${active ? "" : "opacity-60"}`}>
-              <div className="h-1.5" style={{ backgroundColor: b.color }} />
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <div className="grid h-11 w-11 place-items-center rounded-xl text-white" style={{ backgroundColor: b.color }}>
-                    <Landmark className="h-5 w-5" />
+              <Card key={b.id} className={`glass overflow-hidden ${active ? "" : "opacity-60"}`}>
+                <div className="h-1.5" style={{ backgroundColor: b.color }} />
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="grid h-11 w-11 place-items-center rounded-xl text-white" style={{ backgroundColor: b.color }}>
+                      <Landmark className="h-5 w-5" />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {!active && <Badge variant="outline" className="text-[10px]">Pasif</Badge>}
+                      <Button variant="ghost" size="icon" title="Düzenle" onClick={() => openEdit(b)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" title={active ? "Pasif Yap" : "Aktif Yap"}
+                        onClick={() => updateBank(b.id, { active: !active })}>
+                        <Power className={`h-4 w-4 ${active ? "text-success" : "text-muted-foreground"}`} />
+                      </Button>
+                      <Button variant="ghost" size="icon" title="Sil" onClick={() => tryRemove(b)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    {!active && <Badge variant="outline" className="text-[10px]">Pasif</Badge>}
-                    <Button variant="ghost" size="icon" title={active ? "Pasif Yap" : "Aktif Yap"}
-                      onClick={() => updateBank(b.id, { active: !active })}>
-                      <Power className={`h-4 w-4 ${active ? "text-success" : "text-muted-foreground"}`} />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => { if (confirm("Hesap ve hareketleri silinsin mi?")) removeBank(b.id); }}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                  <div className="mt-3 text-base font-semibold">{b.name}</div>
+                  {b.accountName && <div className="text-xs text-muted-foreground">{b.accountName}</div>}
+                  <div className="mt-1 text-xs font-mono text-muted-foreground truncate">{b.iban || "—"}</div>
+                  {(b.branchName || b.branchCode) && (
+                    <div className="text-[11px] text-muted-foreground">
+                      {b.branchName || "Şube"}{b.branchCode ? ` · ${b.branchCode}` : ""}
+                    </div>
+                  )}
+                  <div className="mt-4 text-xs text-muted-foreground">Güncel Bakiye</div>
+                  <div className="text-2xl font-bold tracking-tight">{fmt(bankBalance(b.id), b.currency)}</div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+                    <div className="rounded-md bg-success/10 p-2">
+                      <div className="text-muted-foreground">Bugün Gelen</div>
+                      <div className="font-semibold text-success">{fmt(mm.todayIn, b.currency)}</div>
+                    </div>
+                    <div className="rounded-md bg-destructive/10 p-2">
+                      <div className="text-muted-foreground">Bugün Giden</div>
+                      <div className="font-semibold text-destructive">{fmt(mm.todayOut, b.currency)}</div>
+                    </div>
+                    <div className="rounded-md bg-success/10 p-2">
+                      <div className="text-muted-foreground">Bu Ay Gelen</div>
+                      <div className="font-semibold text-success">{fmt(mm.monthIn, b.currency)}</div>
+                    </div>
+                    <div className="rounded-md bg-destructive/10 p-2">
+                      <div className="text-muted-foreground">Bu Ay Giden</div>
+                      <div className="font-semibold text-destructive">{fmt(mm.monthOut, b.currency)}</div>
+                    </div>
                   </div>
-                </div>
-                <div className="mt-3 text-base font-semibold">{b.name}</div>
-                <div className="mt-1 text-xs font-mono text-muted-foreground truncate">{b.iban || "—"}</div>
-                <div className="mt-4 text-xs text-muted-foreground">Güncel Bakiye</div>
-                <div className="text-2xl font-bold tracking-tight">{fmt(bankBalance(b.id), b.currency)}</div>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-                  <div className="rounded-md bg-success/10 p-2">
-                    <div className="text-muted-foreground">Toplam Gelen</div>
-                    <div className="font-semibold text-success">{fmt(mm.in, b.currency)}</div>
+                  <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
+                    <span>Son: {mm.last || "—"}</span>
+                    <span>{mm.count} hareket</span>
                   </div>
-                  <div className="rounded-md bg-destructive/10 p-2">
-                    <div className="text-muted-foreground">Toplam Giden</div>
-                    <div className="font-semibold text-destructive">{fmt(mm.out, b.currency)}</div>
-                  </div>
-                </div>
-                <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
-                  <span>Son: {mm.last || "—"}</span>
-                  <span>{mm.count} hareket</span>
-                </div>
-                <Link to="/bankalar/$id" params={{ id: b.id }}>
-                  <Button variant="outline" size="sm" className="mt-4 w-full">Hareketler</Button>
-                </Link>
-              </CardContent>
-            </Card>
+                  <Link to="/bankalar/$id" params={{ id: b.id }}>
+                    <Button variant="outline" size="sm" className="mt-4 w-full">Hareketler</Button>
+                  </Link>
+                </CardContent>
+              </Card>
             );
           })}
-
         </div>
       )}
     </div>
