@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Invoice, Cari, Product, Bank, BankTx, CashRegister, CashTx, Category } from "./mock-data";
+import type { Invoice, Cari, Product, Bank, BankTx, CashRegister, CashTx, Category, BankImportRecord } from "./mock-data";
+
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
