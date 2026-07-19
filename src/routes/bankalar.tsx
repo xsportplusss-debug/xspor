@@ -200,7 +200,10 @@ function Page() {
                         onClick={() => updateBank(b.id, { active: !active })}>
                         <Power className={`h-4 w-4 ${active ? "text-success" : "text-muted-foreground"}`} />
                       </Button>
-                      <Button variant="ghost" size="icon" title="Sil" onClick={() => tryRemove(b)}>
+                      <Button variant="ghost" size="icon" title="Hareketleri Sil" onClick={() => clearBankTx(b)}>
+                        <Eraser className="h-4 w-4 text-warning" />
+                      </Button>
+                      <Button variant="ghost" size="icon" title="Bankayı Sil" onClick={() => tryRemove(b)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
