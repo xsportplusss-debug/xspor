@@ -37,7 +37,7 @@ const emptyForm = (): Omit<Product, "id"> => ({
   price1: 0, currency: "TRY", tax: 20, buy: 0, sell: 0, vat: 20, stock: 0, minStock: 0,
 });
 
-const curSymbol = (c: Currency) => (c === "USD" ? "$" : c === "EUR" ? "€" : "₺");
+const curSymbol = (c: Currency) => (c === "USD" ? "$" : c === "EUR" ? "€" : c === "GBP" ? "£" : "₺");
 
 function Page() {
   const products = useStore((s) => s.products);
@@ -232,7 +232,7 @@ function Page() {
 
 function ProductForm({ value, onChange, rates }: { value: any; onChange: (v: any) => void; rates: { USD: number; EUR: number } }) {
   const set = (patch: any) => onChange({ ...value, ...patch });
-  const tl = value.currency === "TRY" ? value.price1 : value.price1 * (value.currency === "USD" ? rates.USD : rates.EUR);
+  const tl = value.currency === "TRY" ? value.price1 : value.price1 * (value.currency === "USD" ? rates.USD : value.currency === "EUR" ? rates.EUR : rates.GBP);
   const kdvDahil = +(tl * (1 + value.tax / 100)).toFixed(2);
   return (
     <div className="grid gap-3">
@@ -256,13 +256,15 @@ function ProductForm({ value, onChange, rates }: { value: any; onChange: (v: any
               <SelectItem value="TRY">₺ TRY</SelectItem>
               <SelectItem value="USD">$ USD</SelectItem>
               <SelectItem value="EUR">€ EUR</SelectItem>
+              <SelectItem value="GBP">£ GBP</SelectItem>
             </SelectContent>
+
           </Select>
         </div>
         <div><Label>KDV %</Label><Input type="number" value={value.tax ?? 20} onChange={(e) => set({ tax: +e.target.value })} /></div>
       </div>
       <p className="text-xs text-muted-foreground">
-        {value.currency !== "TRY" && <>Kur: 1 {value.currency} ≈ {(value.currency === "USD" ? rates.USD : rates.EUR).toFixed(2)} ₺ · </>}
+        {value.currency !== "TRY" && <>Kur: 1 {value.currency} ≈ {(value.currency === "USD" ? rates.USD : value.currency === "EUR" ? rates.EUR : rates.GBP).toFixed(2)} ₺ · </>}
         KDV Dahil: <span className="font-semibold text-foreground">{fmtTL(kdvDahil || 0)}</span>
       </p>
     </div>
