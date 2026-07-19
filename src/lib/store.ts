@@ -239,6 +239,16 @@ export const useStore = create<State & Actions>()(
       })),
 
       updateBank: (id, patch) => set((s) => ({ banks: s.banks.map((x) => x.id === id ? { ...x, ...patch } : x) })),
+      addBankImport: (v) => {
+        const id = uid();
+        set((s) => ({ bankImports: [{ ...v, id }, ...s.bankImports] }));
+        return id;
+      },
+      removeBankImport: (id) => set((s) => ({
+        bankImports: s.bankImports.filter((x) => x.id !== id),
+        bankTx: s.bankTx.filter((t) => t.importId !== id),
+      })),
+
 
       resetAll: () => set(() => ({ ...initial })),
 
