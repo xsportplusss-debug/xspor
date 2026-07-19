@@ -114,6 +114,8 @@ type Actions = {
   removeMarketplaceOrders: (marketplace: string) => void;
   // banks extra
   updateBank: (id: string, patch: Partial<Bank>) => void;
+  addBankImport: (v: Omit<BankImportRecord, "id">) => string;
+  removeBankImport: (id: string) => void;
   // meta
   resetAll: () => void;
 };
@@ -128,10 +130,12 @@ const initial: State = {
   bankTx: [],
   cashRegisters: [],
   cashTx: [],
+  bankImports: [],
   eInvoiceConfig: null,
   eInvoiceLastSync: null,
   marketplaceConfigs: {},
   marketplaceOrders: [],
+
 };
 
 
