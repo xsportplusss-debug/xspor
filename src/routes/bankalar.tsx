@@ -98,41 +98,12 @@ function Page() {
     if (confirm(`${b.name} silinsin mi?`)) removeBank(b.id);
   };
 
-  const seedSamples = async () => {
-    setSeeding(true);
-    try {
-      let totalNew = 0;
-      for (const s of SAMPLES) {
-        let bank = banks.find((b) => b.name.toLowerCase() === s.name.toLowerCase());
-        if (!bank) {
-          addBank({ ...emptyForm, name: s.name, short: s.short, color: s.color });
-          bank = useStore.getState().banks.find((b) => b.name.toLowerCase() === s.name.toLowerCase());
-        }
-        if (!bank) continue;
-        const res = await fetch(s.file);
-        if (!res.ok) { toast.error(`${s.name} dosyası bulunamadı`); continue; }
-        const blob = await res.blob();
-        const file = new File([blob], s.file.split("/").pop()!, { type: blob.type });
-        const rows = await parseExcel(file);
-        const txs = rowsToBankTx(rows, bank.id);
-        const existingKeys = new Set(
-          useStore.getState().bankTx.filter((t) => t.bankId === bank!.id).map(dedupKey),
-        );
-        const fresh = txs.filter((x) => !existingKeys.has(dedupKey(x)));
-        const importId = addBankImport({
-          bankId: bank.id, fileName: file.name, fileType: "xlsx",
-          total: txs.length, success: fresh.length, failed: txs.length - fresh.length,
-          importedAt: new Date().toISOString(),
-        });
-        bulkAddBankTx(fresh.map((x) => ({ ...x, importId })));
-        totalNew += fresh.length;
-      }
-      toast.success(`${totalNew} hareket yüklendi`, { description: "Halk Bankası + Vakıfbank" });
-    } catch (e: any) {
-      toast.error("Yükleme başarısız", { description: e.message });
-    } finally {
-      setSeeding(false);
-    }
+  const clearBankTx = (b: Bank) => {
+    const ids = bankTx.filter((t) => t.bankId === b.id).map((t) => t.id);
+    if (ids.length === 0) return toast.info("Bu bankada hareket yok");
+    if (!confirm(`${b.name} — ${ids.length} hareketin tamamı silinsin mi?`)) return;
+    bulkRemoveBankTx(ids);
+    toast.success(`${ids.length} hareket silindi`);
   };
 
   return (
