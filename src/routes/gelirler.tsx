@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, Wallet, Landmark } from "lucide-react";
+import { TrendingUp, Wallet, Landmark, Store } from "lucide-react";
 import { useMemo, useState } from "react";
 import { fmtTL } from "@/lib/mock-data";
 import { useStore } from "@/lib/store";
@@ -27,6 +27,7 @@ function Page() {
   const cashes = useStore((s) => s.cashRegisters);
   const bankTx = useStore((s) => s.bankTx);
   const cashTx = useStore((s) => s.cashTx);
+  const mpOrders = useStore((s) => s.marketplaceOrders);
   const [source, setSource] = useState("all");
   const [q, setQ] = useState("");
 
@@ -39,8 +40,12 @@ function Page() {
       id: t.id, date: t.date, source: cashes.find((c) => c.id === t.cashId)?.name ?? "Kasa",
       kind: "Kasa" as const, description: t.description, category: t.category || "—", amount: t.amount,
     }));
-    return [...b, ...c].sort((x, y) => (x.date < y.date ? 1 : -1));
-  }, [bankTx, cashTx, banks, cashes]);
+    const m = mpOrders.map((o) => ({
+      id: o.id, date: o.date, source: o.marketplace,
+      kind: "Pazar Yeri" as const, description: `${o.orderNo} — ${o.customer}`, category: o.status, amount: o.net,
+    }));
+    return [...b, ...c, ...m].sort((x, y) => (x.date < y.date ? 1 : -1));
+  }, [bankTx, cashTx, mpOrders, banks, cashes]);
 
   const filtered = all.filter((r) =>
     (source === "all" || r.kind === source) &&
@@ -49,19 +54,22 @@ function Page() {
 
   const totalBank = all.filter((r) => r.kind === "Banka").reduce((a, b) => a + b.amount, 0);
   const totalCash = all.filter((r) => r.kind === "Kasa").reduce((a, b) => a + b.amount, 0);
+  const totalMp = all.filter((r) => r.kind === "Pazar Yeri").reduce((a, b) => a + b.amount, 0);
+
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Gelirler" subtitle="Tüm banka ve kasa gelirleri tek tabloda." />
+      <PageHeader title="Gelirler" subtitle="Banka, kasa ve pazaryeri gelirleri tek tabloda." />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Toplam Gelir" value={fmtTL(totalBank + totalCash)} icon={TrendingUp} tone="success" />
-        <StatCard label="Banka Girişleri" value={fmtTL(totalBank)} icon={Landmark} tone="primary" />
-        <StatCard label="Kasa Girişleri" value={fmtTL(totalCash)} icon={Wallet} tone="info" />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="Toplam Gelir" value={fmtTL(totalBank + totalCash + totalMp)} icon={TrendingUp} tone="success" />
+        <StatCard label="Banka" value={fmtTL(totalBank)} icon={Landmark} tone="primary" />
+        <StatCard label="Kasa" value={fmtTL(totalCash)} icon={Wallet} tone="info" />
+        <StatCard label="Pazar Yeri" value={fmtTL(totalMp)} icon={Store} tone="warning" />
       </div>
 
       {all.length === 0 ? (
-        <EmptyState title="Henüz gelir yok" desc="Banka veya Kasa hareketleri girildiğinde otomatik listelenir." />
+        <EmptyState title="Henüz gelir yok" desc="Banka, Kasa veya Pazar yeri hareketleri girildiğinde otomatik listelenir." />
       ) : (
         <Card className="glass"><CardContent className="p-4">
           <div className="mb-4 flex flex-wrap gap-2">
@@ -72,9 +80,11 @@ function Page() {
                 <SelectItem value="all">Tümü</SelectItem>
                 <SelectItem value="Banka">Banka</SelectItem>
                 <SelectItem value="Kasa">Kasa</SelectItem>
+                <SelectItem value="Pazar Yeri">Pazar Yeri</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>

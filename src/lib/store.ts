@@ -4,6 +4,39 @@ import type { Invoice, Cari, Product, Bank, BankTx, CashRegister, CashTx, Catego
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
+export type EInvoiceConfig = {
+  apiUrl: string;
+  username: string;
+  password: string;
+  companyCode: string;
+  token: string;
+  provider: string; // GİB veya entegratör adı
+};
+
+export type MarketplaceConfig = {
+  apiUrl: string;
+  apiKey: string;
+  apiSecret: string;
+  merchantId: string;
+  token: string;
+  connected: boolean;
+  lastSync?: string;
+};
+
+export type MarketplaceOrder = {
+  id: string;
+  marketplace: string; // trendyol, hepsiburada, ...
+  orderNo: string;
+  date: string;
+  customer: string;
+  amount: number;   // sipariş tutarı (KDV dahil)
+  vat: number;
+  shipping: number;
+  commission: number;
+  net: number;      // net kazanç
+  status: "Yeni" | "Hazırlanıyor" | "Kargo" | "Tamamlandı" | "İade";
+};
+
 type State = {
   salesInvoices: Invoice[];
   purchaseInvoices: Invoice[];
@@ -14,7 +47,12 @@ type State = {
   bankTx: BankTx[];
   cashRegisters: CashRegister[];
   cashTx: CashTx[];
+  eInvoiceConfig: EInvoiceConfig | null;
+  eInvoiceLastSync: string | null;
+  marketplaceConfigs: Record<string, MarketplaceConfig>;
+  marketplaceOrders: MarketplaceOrder[];
 };
+
 
 type Actions = {
   // sales
@@ -63,6 +101,16 @@ type Actions = {
   updateCashTx: (id: string, patch: Partial<CashTx>) => void;
   removeCashTx: (id: string) => void;
   bulkRemoveCashTx: (ids: string[]) => void;
+  // e-invoice
+  setEInvoiceConfig: (c: EInvoiceConfig | null) => void;
+  setEInvoiceLastSync: (iso: string) => void;
+  // marketplace
+  setMarketplaceConfig: (id: string, c: MarketplaceConfig) => void;
+  removeMarketplaceConfig: (id: string) => void;
+  addMarketplaceOrders: (list: Omit<MarketplaceOrder, "id">[]) => number;
+  removeMarketplaceOrders: (marketplace: string) => void;
+  // banks extra
+  updateBank: (id: string, patch: Partial<Bank>) => void;
   // meta
   resetAll: () => void;
 };
@@ -77,7 +125,12 @@ const initial: State = {
   bankTx: [],
   cashRegisters: [],
   cashTx: [],
+  eInvoiceConfig: null,
+  eInvoiceLastSync: null,
+  marketplaceConfigs: {},
+  marketplaceOrders: [],
 };
+
 
 export const useStore = create<State & Actions>()(
   persist(
@@ -149,7 +202,39 @@ export const useStore = create<State & Actions>()(
       removeCashTx: (id) => set((s) => ({ cashTx: s.cashTx.filter((x) => x.id !== id) })),
       bulkRemoveCashTx: (ids) => set((s) => ({ cashTx: s.cashTx.filter((x) => !ids.includes(x.id)) })),
 
+      setEInvoiceConfig: (c) => set(() => ({ eInvoiceConfig: c })),
+      setEInvoiceLastSync: (iso) => set(() => ({ eInvoiceLastSync: iso })),
+
+      setMarketplaceConfig: (id, c) => set((s) => ({ marketplaceConfigs: { ...s.marketplaceConfigs, [id]: c } })),
+      removeMarketplaceConfig: (id) => set((s) => {
+        const cfg = { ...s.marketplaceConfigs };
+        delete cfg[id];
+        return { marketplaceConfigs: cfg };
+      }),
+      addMarketplaceOrders: (list) => {
+        let added = 0;
+        set((s) => {
+          const existing = new Set(s.marketplaceOrders.map((o) => `${o.marketplace}:${o.orderNo}`));
+          const fresh: MarketplaceOrder[] = [];
+          for (const o of list) {
+            const key = `${o.marketplace}:${o.orderNo}`;
+            if (existing.has(key)) continue;
+            existing.add(key);
+            fresh.push({ ...o, id: uid() });
+            added++;
+          }
+          return { marketplaceOrders: [...fresh, ...s.marketplaceOrders] };
+        });
+        return added;
+      },
+      removeMarketplaceOrders: (marketplace) => set((s) => ({
+        marketplaceOrders: s.marketplaceOrders.filter((o) => o.marketplace !== marketplace),
+      })),
+
+      updateBank: (id, patch) => set((s) => ({ banks: s.banks.map((x) => x.id === id ? { ...x, ...patch } : x) })),
+
       resetAll: () => set(() => ({ ...initial })),
+
     }),
     { name: "fintra:v1" },
   ),

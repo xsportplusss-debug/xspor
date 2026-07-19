@@ -18,7 +18,10 @@ export type Invoice = {
   subtotal?: number;
   vat?: number;
   discount?: number;
+  source?: "manual" | "e-invoice";
+  uuid?: string;
 };
+
 
 export type Cari = {
   id: string;
@@ -31,7 +34,7 @@ export type Cari = {
   type: "Müşteri" | "Tedarikçi";
 };
 
-export type Currency = "TRY" | "USD" | "EUR";
+export type Currency = "TRY" | "USD" | "EUR" | "GBP";
 
 export type Product = {
   id: string;
@@ -59,7 +62,9 @@ export type Bank = {
   currency: string;
   balance: number; // açılış bakiyesi
   color: string;
+  active?: boolean; // pasif yapıldıysa false
 };
+
 
 export type BankTx = {
   id: string;

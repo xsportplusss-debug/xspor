@@ -7,12 +7,14 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
-import { Landmark, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Landmark, Plus, Power, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { fmt } from "@/lib/mock-data";
 import { useStore, bankBalance } from "@/lib/store";
 import { EmptyState } from "@/components/empty-state";
+import { Badge } from "@/components/ui/badge";
+
 
 export const Route = createFileRoute("/bankalar")({
   head: () => ({
@@ -28,8 +30,23 @@ const COLORS = ["#00A651", "#0055A4", "#004990", "#E30613", "#7B2CBF", "#F27A1A"
 
 function Page() {
   const banks = useStore((s) => s.banks);
+  const bankTx = useStore((s) => s.bankTx);
   const addBank = useStore((s) => s.addBank);
   const removeBank = useStore((s) => s.removeBank);
+  const updateBank = useStore((s) => s.updateBank);
+
+  const metrics = useMemo(() => {
+    const m: Record<string, { in: number; out: number; last: string; count: number }> = {};
+    for (const b of banks) m[b.id] = { in: 0, out: 0, last: "", count: 0 };
+    for (const t of bankTx) {
+      const x = m[t.bankId]; if (!x) continue;
+      x.count++;
+      if (t.amount >= 0) x.in += t.amount; else x.out += -t.amount;
+      if (!x.last || t.date > x.last) x.last = t.date;
+    }
+    return m;
+  }, [banks, bankTx]);
+
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", short: "", iban: "", currency: "TRY", balance: 0, color: COLORS[0] });
@@ -90,28 +107,54 @@ function Page() {
         <EmptyState icon={Landmark} title="Henüz banka hesabı yok" desc="Yeni hesap ekleyin, ardından hareket girin veya ekstre içe aktarın." />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {banks.map((b) => (
-            <Card key={b.id} className="glass overflow-hidden">
+          {banks.map((b) => {
+            const active = b.active !== false;
+            const mm = metrics[b.id];
+            return (
+            <Card key={b.id} className={`glass overflow-hidden ${active ? "" : "opacity-60"}`}>
               <div className="h-1.5" style={{ backgroundColor: b.color }} />
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
                   <div className="grid h-11 w-11 place-items-center rounded-xl text-white" style={{ backgroundColor: b.color }}>
                     <Landmark className="h-5 w-5" />
                   </div>
-                  <Button variant="ghost" size="icon" onClick={() => { if (confirm("Hesap ve hareketleri silinsin mi?")) removeBank(b.id); }}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    {!active && <Badge variant="outline" className="text-[10px]">Pasif</Badge>}
+                    <Button variant="ghost" size="icon" title={active ? "Pasif Yap" : "Aktif Yap"}
+                      onClick={() => updateBank(b.id, { active: !active })}>
+                      <Power className={`h-4 w-4 ${active ? "text-success" : "text-muted-foreground"}`} />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => { if (confirm("Hesap ve hareketleri silinsin mi?")) removeBank(b.id); }}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="mt-3 text-base font-semibold">{b.name}</div>
                 <div className="mt-1 text-xs font-mono text-muted-foreground truncate">{b.iban || "—"}</div>
                 <div className="mt-4 text-xs text-muted-foreground">Güncel Bakiye</div>
                 <div className="text-2xl font-bold tracking-tight">{fmt(bankBalance(b.id), b.currency)}</div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+                  <div className="rounded-md bg-success/10 p-2">
+                    <div className="text-muted-foreground">Toplam Gelen</div>
+                    <div className="font-semibold text-success">{fmt(mm.in, b.currency)}</div>
+                  </div>
+                  <div className="rounded-md bg-destructive/10 p-2">
+                    <div className="text-muted-foreground">Toplam Giden</div>
+                    <div className="font-semibold text-destructive">{fmt(mm.out, b.currency)}</div>
+                  </div>
+                </div>
+                <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
+                  <span>Son: {mm.last || "—"}</span>
+                  <span>{mm.count} hareket</span>
+                </div>
                 <Link to="/bankalar/$id" params={{ id: b.id }}>
                   <Button variant="outline" size="sm" className="mt-4 w-full">Hareketler</Button>
                 </Link>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
+
         </div>
       )}
     </div>

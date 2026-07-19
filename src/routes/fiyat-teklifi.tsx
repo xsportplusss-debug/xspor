@@ -233,9 +233,11 @@ function Page() {
                 <SelectContent>
                   <SelectItem value="USD">USD ($)</SelectItem>
                   <SelectItem value="EUR">EUR (€)</SelectItem>
+                  <SelectItem value="GBP">GBP (£)</SelectItem>
                   <SelectItem value="TRY">TRY (₺)</SelectItem>
                 </SelectContent>
               </Select>
+
             </div>
             <div>
               <Label className="text-xs">Manuel Kur (1 {docCurrency} = ? ₺)</Label>
