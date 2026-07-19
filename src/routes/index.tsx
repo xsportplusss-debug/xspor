@@ -34,11 +34,20 @@ function Dashboard() {
   const products = useStore((s) => s.products);
   const bankTx = useStore((s) => s.bankTx);
   const cashTx = useStore((s) => s.cashTx);
+  const eInvoiceCfg = useStore((s) => s.eInvoiceConfig);
+  const marketplaceConfigs = useStore((s) => s.marketplaceConfigs);
+  const marketplaceOrders = useStore((s) => s.marketplaceOrders);
 
   const totalBank = banks.reduce((a, b) => a + bankBalance(b.id), 0);
   const totalCash = cashes.reduce((a, c) => a + cashBalance(c.id), 0);
   const monthSales = salesInvoices.reduce((a, b) => a + b.total, 0);
   const monthBuys = purchaseInvoices.reduce((a, b) => a + b.total, 0);
+  const marketplaceNet = marketplaceOrders.reduce((a, o) => a + o.net, 0);
+  const marketplaceCount = marketplaceOrders.length;
+  const connectedMarketplaces = Object.values(marketplaceConfigs).filter((c) => c.connected).length;
+  const pendingSales = salesInvoices.filter((i) => i.status === "Ödeme Bekleniyor").reduce((a, b) => a + b.total, 0);
+  const pendingPurchases = purchaseInvoices.filter((i) => i.status === "Ödeme Yapılacak").reduce((a, b) => a + b.total, 0);
+
 
   const chart = useMemo(() => {
     const map = new Map<string, { m: string; gelir: number; gider: number }>();
@@ -60,11 +69,18 @@ function Dashboard() {
         title="Hoş geldin 👋"
         subtitle="Bugünün özeti ve genel bakış."
         actions={
-          <Link to="/satis-faturalari">
-            <Button size="sm" className="gradient-primary text-primary-foreground shadow-elegant">
-              <ArrowUpRight className="mr-1 h-4 w-4" /> Yeni Fatura
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            {eInvoiceCfg && (
+              <Badge className="bg-success text-success-foreground gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5" /> E-Fatura Bağlı
+              </Badge>
+            )}
+            <Link to="/satis-faturalari">
+              <Button size="sm" className="gradient-primary text-primary-foreground shadow-elegant">
+                <ArrowUpRight className="mr-1 h-4 w-4" /> Yeni Fatura
+              </Button>
+            </Link>
+          </div>
         }
       />
 
@@ -73,7 +89,12 @@ function Dashboard() {
         <StatCard label="Toplam Alış" value={fmtTL(monthBuys)} icon={TrendingDown} tone="warning" />
         <StatCard label="Kasa" value={fmtTL(totalCash)} icon={Wallet} tone="info" hint={`${cashes.length} kasa`} />
         <StatCard label="Banka" value={fmtTL(totalBank)} icon={Landmark} tone="success" hint={`${banks.length} hesap`} />
+        <StatCard label="Bekleyen Tahsilat" value={fmtTL(pendingSales)} icon={ShoppingBag} tone="info" />
+        <StatCard label="Bekleyen Borç" value={fmtTL(pendingPurchases)} icon={TrendingDown} tone="warning" />
+        <StatCard label="Pazar Yeri Siparişleri" value={String(marketplaceCount)} icon={Store} tone="primary" hint={`${connectedMarketplaces} bağlı`} />
+        <StatCard label="Pazar Yeri Net Kâr" value={fmtTL(marketplaceNet)} icon={Store} tone="success" />
       </div>
+
 
       {isEmpty && (
         <Card className="glass border-dashed">
