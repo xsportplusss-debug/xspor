@@ -115,6 +115,10 @@ function Page() {
         title="Bankalar"
         subtitle={`${banks.length} hesap`}
         actions={
+          <>
+          <Button size="sm" variant="outline" onClick={seedSamples} disabled={seeding}>
+            <Sparkles className="mr-1 h-4 w-4" /> {seeding ? "Yükleniyor…" : "Örnek Ekstreleri Yükle"}
+          </Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button size="sm" className="gradient-primary text-primary-foreground shadow-elegant">
