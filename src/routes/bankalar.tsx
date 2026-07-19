@@ -7,11 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Landmark, Plus, Power, Trash2, Sparkles, Pencil } from "lucide-react";
+import { Landmark, Plus, Power, Trash2, Pencil, Eraser, ListOrdered } from "lucide-react";
 import { useMemo, useState } from "react";
-import { parseExcel, rowsToBankTx } from "@/lib/importers";
 import { toast } from "sonner";
 import { fmt, type Bank } from "@/lib/mock-data";
 import { useStore, bankBalance } from "@/lib/store";
