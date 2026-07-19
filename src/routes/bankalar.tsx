@@ -30,13 +30,6 @@ export const Route = createFileRoute("/bankalar")({
 const COLORS = ["#00A651", "#0055A4", "#004990", "#E30613", "#7B2CBF", "#F27A1A"];
 const CURRENCIES = ["TRY", "USD", "EUR", "GBP", "CHF"];
 
-const dedupKey = (t: { date: string; description: string; amount: number; refNo?: string }) =>
-  `${t.date}|${t.refNo || ""}|${t.description.trim().toLowerCase()}|${t.amount.toFixed(2)}`;
-
-const SAMPLES: { file: string; name: string; short: string; color: string }[] = [
-  { file: "/samples/halk-bankasi.xlsx", name: "Halk Bankası", short: "HALK", color: "#E30613" },
-  { file: "/samples/vakif-bank.xlsx", name: "Vakıfbank", short: "VKF", color: "#F27A1A" },
-];
 
 type FormState = Omit<Bank, "id">;
 
