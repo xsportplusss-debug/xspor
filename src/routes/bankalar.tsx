@@ -242,7 +242,9 @@ function Page() {
                     <span>{mm.count} hareket</span>
                   </div>
                   <Link to="/bankalar/$id" params={{ id: b.id }}>
-                    <Button variant="outline" size="sm" className="mt-4 w-full">Hareketler</Button>
+                    <Button size="sm" className="mt-4 w-full gradient-primary text-primary-foreground">
+                      <ListOrdered className="mr-1 h-4 w-4" /> Hareketleri Gör ({mm.count})
+                    </Button>
                   </Link>
                 </CardContent>
               </Card>
