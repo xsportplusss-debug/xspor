@@ -7,12 +7,14 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
-import { Landmark, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Landmark, Plus, Power, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { fmt } from "@/lib/mock-data";
 import { useStore, bankBalance } from "@/lib/store";
 import { EmptyState } from "@/components/empty-state";
+import { Badge } from "@/components/ui/badge";
+
 
 export const Route = createFileRoute("/bankalar")({
   head: () => ({
@@ -28,8 +30,23 @@ const COLORS = ["#00A651", "#0055A4", "#004990", "#E30613", "#7B2CBF", "#F27A1A"
 
 function Page() {
   const banks = useStore((s) => s.banks);
+  const bankTx = useStore((s) => s.bankTx);
   const addBank = useStore((s) => s.addBank);
   const removeBank = useStore((s) => s.removeBank);
+  const updateBank = useStore((s) => s.updateBank);
+
+  const metrics = useMemo(() => {
+    const m: Record<string, { in: number; out: number; last: string; count: number }> = {};
+    for (const b of banks) m[b.id] = { in: 0, out: 0, last: "", count: 0 };
+    for (const t of bankTx) {
+      const x = m[t.bankId]; if (!x) continue;
+      x.count++;
+      if (t.amount >= 0) x.in += t.amount; else x.out += -t.amount;
+      if (!x.last || t.date > x.last) x.last = t.date;
+    }
+    return m;
+  }, [banks, bankTx]);
+
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", short: "", iban: "", currency: "TRY", balance: 0, color: COLORS[0] });
