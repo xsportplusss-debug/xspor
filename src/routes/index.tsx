@@ -6,8 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  Wallet, Landmark, TrendingUp, TrendingDown, Package, ShoppingBag, ArrowUpRight, AlertTriangle,
+  Wallet, Landmark, TrendingDown, Package, ShoppingBag, ArrowUpRight, AlertTriangle, Store, CheckCircle2,
 } from "lucide-react";
+
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, CartesianGrid, Legend,
 } from "recharts";
