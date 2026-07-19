@@ -18,7 +18,9 @@ import {
   UserCog,
   Building2,
   FileSignature,
+  Cloud,
   Sparkles,
+
 } from "lucide-react";
 import {
   Sidebar,
@@ -47,6 +49,7 @@ const salesItems = [
   { title: "Alış Faturaları", url: "/alis-faturalari", icon: ShoppingCart },
   { title: "Fiyat Teklifi", url: "/fiyat-teklifi", icon: FileSignature },
   { title: "E-Arşiv", url: "/e-arsiv", icon: Archive },
+  { title: "E-Fatura Entegrasyonu", url: "/e-fatura-entegrasyon", icon: Cloud },
 ];
 
 const cariItems = [
@@ -66,12 +69,18 @@ const financeItems = [
 ];
 
 const marketplaceItems = [
+  { title: "API Ayarları", url: "/pazaryerleri/ayarlar" },
   { title: "Trendyol", url: "/pazaryerleri/trendyol" },
   { title: "Hepsiburada", url: "/pazaryerleri/hepsiburada" },
   { title: "Amazon", url: "/pazaryerleri/amazon" },
   { title: "N11", url: "/pazaryerleri/n11" },
   { title: "Pazarama", url: "/pazaryerleri/pazarama" },
+  { title: "ÇiçekSepeti", url: "/pazaryerleri/ciceksepeti" },
+  { title: "PTTAVM", url: "/pazaryerleri/pttavm" },
+  { title: "idefix", url: "/pazaryerleri/idefix" },
+  { title: "Turkcell Pasaj", url: "/pazaryerleri/turkcell-pasaj" },
 ];
+
 
 const otherItems = [
   { title: "Raporlar", url: "/raporlar", icon: BarChart3 },
