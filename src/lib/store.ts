@@ -101,6 +101,16 @@ type Actions = {
   updateCashTx: (id: string, patch: Partial<CashTx>) => void;
   removeCashTx: (id: string) => void;
   bulkRemoveCashTx: (ids: string[]) => void;
+  // e-invoice
+  setEInvoiceConfig: (c: EInvoiceConfig | null) => void;
+  setEInvoiceLastSync: (iso: string) => void;
+  // marketplace
+  setMarketplaceConfig: (id: string, c: MarketplaceConfig) => void;
+  removeMarketplaceConfig: (id: string) => void;
+  addMarketplaceOrders: (list: Omit<MarketplaceOrder, "id">[]) => number;
+  removeMarketplaceOrders: (marketplace: string) => void;
+  // banks extra
+  updateBank: (id: string, patch: Partial<Bank>) => void;
   // meta
   resetAll: () => void;
 };
@@ -115,7 +125,12 @@ const initial: State = {
   bankTx: [],
   cashRegisters: [],
   cashTx: [],
+  eInvoiceConfig: null,
+  eInvoiceLastSync: null,
+  marketplaceConfigs: {},
+  marketplaceOrders: [],
 };
+
 
 export const useStore = create<State & Actions>()(
   persist(
