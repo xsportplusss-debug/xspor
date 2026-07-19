@@ -95,6 +95,7 @@ function Page() {
         const importId = addBankImport({
           bankId: bank.id, fileName: file.name, fileType: "xlsx",
           total: txs.length, success: fresh.length, failed: txs.length - fresh.length,
+          importedAt: new Date().toISOString(),
         });
         bulkAddBankTx(fresh.map((x) => ({ ...x, importId })));
         totalNew += fresh.length;
