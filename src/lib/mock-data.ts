@@ -52,6 +52,7 @@ export type Product = {
   vat: number;
   stock: number;
   minStock: number;
+  kur?: number;           // Manuel kur (Fiyatları Güncelle butonuyla kullanılır)
 };
 
 export type Bank = {
