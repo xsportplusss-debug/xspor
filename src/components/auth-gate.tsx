@@ -136,6 +136,11 @@ function AuthScreen() {
           </p>
         </CardHeader>
         <CardContent className="space-y-4 pt-2">
+          {isInAppBrowser() && (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
+              Bu bağlantıyı uygulama içi tarayıcıda açtınız (Instagram, WhatsApp, Messenger vb.). Google güvenlik politikası bu tür tarayıcılarda girişi engelliyor. Lütfen sağ üstteki menüden <b>"Tarayıcıda Aç"</b> seçeneği ile Safari veya Chrome'da açın.
+            </div>
+          )}
           <Button onClick={signIn} disabled={busy} className="w-full" variant="outline">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : (
               <>
@@ -143,7 +148,11 @@ function AuthScreen() {
               </>
             )}
           </Button>
+          <p className="text-center text-[11px] text-muted-foreground">
+            Yetkili hesap: <b>{ALLOWED_EMAIL}</b>
+          </p>
         </CardContent>
+
       </Card>
     </div>
   );
