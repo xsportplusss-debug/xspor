@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UrunlerRouteImport } from './routes/urunler'
 import { Route as TakvimRouteImport } from './routes/takvim'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SatisFaturalariRouteImport } from './routes/satis-faturalari'
 import { Route as RaporlarRouteImport } from './routes/raporlar'
 import { Route as MusterilerRouteImport } from './routes/musteriler'
@@ -51,6 +52,11 @@ const UrunlerRoute = UrunlerRouteImport.update({
 const TakvimRoute = TakvimRouteImport.update({
   id: '/takvim',
   path: '/takvim',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SatisFaturalariRoute = SatisFaturalariRouteImport.update({
@@ -228,6 +234,7 @@ export interface FileRoutesByFullPath {
   '/musteriler': typeof MusterilerRoute
   '/raporlar': typeof RaporlarRoute
   '/satis-faturalari': typeof SatisFaturalariRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/takvim': typeof TakvimRoute
   '/urunler': typeof UrunlerRoute
   '/bankalar/$id': typeof BankalarIdRoute
@@ -263,6 +270,7 @@ export interface FileRoutesByTo {
   '/musteriler': typeof MusterilerRoute
   '/raporlar': typeof RaporlarRoute
   '/satis-faturalari': typeof SatisFaturalariRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/takvim': typeof TakvimRoute
   '/urunler': typeof UrunlerRoute
   '/bankalar/$id': typeof BankalarIdRoute
@@ -299,6 +307,7 @@ export interface FileRoutesById {
   '/musteriler': typeof MusterilerRoute
   '/raporlar': typeof RaporlarRoute
   '/satis-faturalari': typeof SatisFaturalariRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/takvim': typeof TakvimRoute
   '/urunler': typeof UrunlerRoute
   '/bankalar/$id': typeof BankalarIdRoute
@@ -336,6 +345,7 @@ export interface FileRouteTypes {
     | '/musteriler'
     | '/raporlar'
     | '/satis-faturalari'
+    | '/sitemap.xml'
     | '/takvim'
     | '/urunler'
     | '/bankalar/$id'
@@ -371,6 +381,7 @@ export interface FileRouteTypes {
     | '/musteriler'
     | '/raporlar'
     | '/satis-faturalari'
+    | '/sitemap.xml'
     | '/takvim'
     | '/urunler'
     | '/bankalar/$id'
@@ -406,6 +417,7 @@ export interface FileRouteTypes {
     | '/musteriler'
     | '/raporlar'
     | '/satis-faturalari'
+    | '/sitemap.xml'
     | '/takvim'
     | '/urunler'
     | '/bankalar/$id'
@@ -442,6 +454,7 @@ export interface RootRouteChildren {
   MusterilerRoute: typeof MusterilerRoute
   RaporlarRoute: typeof RaporlarRoute
   SatisFaturalariRoute: typeof SatisFaturalariRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TakvimRoute: typeof TakvimRoute
   UrunlerRoute: typeof UrunlerRoute
   PazaryerleriAmazonRoute: typeof PazaryerleriAmazonRoute
@@ -471,6 +484,13 @@ declare module '@tanstack/react-router' {
       path: '/takvim'
       fullPath: '/takvim'
       preLoaderRoute: typeof TakvimRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/satis-faturalari': {
@@ -736,6 +756,7 @@ const rootRouteChildren: RootRouteChildren = {
   MusterilerRoute: MusterilerRoute,
   RaporlarRoute: RaporlarRoute,
   SatisFaturalariRoute: SatisFaturalariRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   TakvimRoute: TakvimRoute,
   UrunlerRoute: UrunlerRoute,
   PazaryerleriAmazonRoute: PazaryerleriAmazonRoute,
@@ -753,13 +774,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

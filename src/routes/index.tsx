@@ -115,7 +115,7 @@ function Dashboard() {
       {chart.length > 0 && (
         <Card className="glass">
           <CardHeader className="pb-2">
-            <CardTitle asChild className="text-base"><h2>Gelir / Gider (Aylık)</h2></CardTitle>
+            <h2 className="text-base font-semibold leading-none tracking-tight">Gelir / Gider (Aylık)</h2>
             <p className="text-xs text-muted-foreground">Banka ve kasa hareketlerinden</p>
           </CardHeader>
           <CardContent className="h-72">
@@ -137,7 +137,7 @@ function Dashboard() {
       {salesInvoices.length > 0 && (
         <Card className="glass">
           <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle asChild className="text-base"><h2>Son Satışlar</h2></CardTitle>
+            <h2 className="text-base font-semibold leading-none tracking-tight">Son Satışlar</h2>
             <Link to="/satis-faturalari"><Button variant="ghost" size="sm">Tümünü Gör</Button></Link>
           </CardHeader>
           <CardContent>
@@ -170,12 +170,10 @@ function Dashboard() {
       {lowStock.length > 0 && (
         <Card className="glass">
           <CardHeader className="pb-2">
-            <CardTitle asChild className="text-base">
-              <h2 className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-warning" />
-                Düşük Stok Uyarıları
-              </h2>
-            </CardTitle>
+            <h2 className="flex items-center gap-2 text-base font-semibold leading-none tracking-tight">
+              <AlertTriangle className="h-4 w-4 text-warning" />
+              Düşük Stok Uyarıları
+            </h2>
           </CardHeader>
           <CardContent>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
