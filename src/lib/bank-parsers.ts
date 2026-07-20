@@ -1,25 +1,31 @@
 // Modüler banka ekstre PDF parser'ları.
-// Yeni banka eklemek için: DETECTORS listesine bir { match, parse } girişi ekleyin.
+// Yeni banka eklemek için: PARSERS listesine bir { name, detect, parse } girişi ekleyin.
+//
+// Parser gövde satırlarını (birleştirilmiş metin, satır bazında) alır ve
+// çok satırlı açıklamaları tek harekete gruplar.
 
 import type { BankTx } from "./mock-data";
 
-type Ctx = { bankId: string; text: string; lines: string[][] };
-type Parser = { name: string; match: (t: string) => boolean; parse: (c: Ctx) => Omit<BankTx, "id">[] };
+type Ctx = { bankId: string; lines: string[] };
+export type BankParser = {
+  name: string;
+  detect: (text: string) => boolean;
+  parse: (c: Ctx) => Omit<BankTx, "id">[];
+};
 
-// yardımcılar
+// ----- yardımcılar -----
 const toNum = (s: string): number => {
-  const raw = s.replace(/[^\d.,-]/g, "").trim();
+  const raw = (s || "").replace(/[^\d.,-]/g, "").trim();
   if (!raw) return 0;
   const neg = raw.startsWith("-");
   const clean = raw.replace(/^-/, "");
-  // TR: nokta binlik, virgül ondalık
   const hasComma = clean.includes(",");
   const norm = hasComma ? clean.replace(/\./g, "").replace(",", ".") : clean.replace(/,/g, "");
   const n = parseFloat(norm);
   return isNaN(n) ? 0 : neg ? -n : n;
 };
 
-const toIsoDate = (s: string): string => {
+const toIso = (s: string): string => {
   const m = s.match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/);
   if (!m) return "";
   const [, d, mo, y] = m;
@@ -27,99 +33,135 @@ const toIsoDate = (s: string): string => {
   return `${yr}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`;
 };
 
+const classify = (desc: string, amount: number): string => {
+  const d = desc.toLowerCase();
+  if (/fast|eft|havale/.test(d)) return amount > 0 ? "Gelen Havale/EFT" : "Giden Havale/EFT";
+  if (/kredi kart/.test(d)) return "Kredi Kartı";
+  if (/nakit çek|nakit çekile|nakit para çek|mevduat para çek/.test(d)) return "Nakit Çekim";
+  if (/nakit yat/.test(d)) return "Nakit Yatırma";
+  if (/pos/.test(d)) return "POS";
+  if (/masraf|komisyon|ücret/.test(d)) return "Masraf/Komisyon";
+  if (/vergi|otm ödeme|fatura/.test(d)) return "Fatura/Vergi";
+  return "";
+};
+
 // ---------- Halkbank ----------
-// Tipik satır: TARİH  VALÖR  AÇIKLAMA  BORÇ  ALACAK  BAKİYE
-const halkbank: Parser = {
+// Başlık satırı:  dd-mm-yyyy  <tutar±>  <bakiye>  <açıklama...>
+// Devam satırı: tarih ile başlamaz — önceki hareketin açıklamasına eklenir.
+const halkbank: BankParser = {
   name: "Halkbank",
-  match: (t) => /halkbank|halk bankas[ıi]/i.test(t),
+  detect: (t) => /halkbank|halk bankas|türkiye halk/i.test(t),
   parse: ({ bankId, lines }) => {
-    const out: Omit<BankTx, "id">[] = [];
-    const dateRe = /\d{2}[./-]\d{2}[./-]\d{4}/g;
-    for (const cells of lines) {
-      const joined = cells.join(" ");
-      const dates = joined.match(dateRe);
-      if (!dates || dates.length === 0) continue;
-      const nums = joined.match(/-?[\d.]+,\d{2}/g) || [];
-      if (nums.length < 2) continue;
-      // Halkbank: son 3 sayı borç, alacak, bakiye (biri boş olabilir → "0,00" gelmez, atlanır)
-      const last = nums.slice(-3);
-      let debit = 0, credit = 0;
-      if (last.length === 3) {
-        debit = toNum(last[0]); credit = toNum(last[1]);
-      } else if (last.length === 2) {
-        // borç veya alacak + bakiye
-        const val = toNum(last[0]);
-        if (/borç|debit|çıkış/i.test(joined)) debit = val; else credit = val;
+    const header = /^(\d{2}-\d{2}-\d{4})\s+(-?[\d.]+,\d{2})\s+(-?[\d.]+,\d{2})\s+(.*)$/;
+    const out: (Omit<BankTx, "id"> & { balance?: number })[] = [];
+    let cur: any = null;
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line) continue;
+      const m = line.match(header);
+      if (m) {
+        if (cur) out.push(cur);
+        const amount = toNum(m[2]);
+        const desc = m[4].trim();
+        cur = {
+          bankId,
+          date: toIso(m[1]),
+          amount,
+          description: desc,
+          category: classify(desc, amount) || undefined,
+          note: `Bakiye: ${m[3]}`,
+        };
+      } else if (cur) {
+        cur.description = `${cur.description} ${line}`.replace(/\s+/g, " ").trim();
+        if (cur.category === undefined) {
+          const c = classify(cur.description, cur.amount);
+          if (c) cur.category = c;
+        }
       }
-      const amount = credit - debit;
-      if (!amount) continue;
-      const date = toIsoDate(dates[0]);
-      let desc = joined;
-      for (const d of dates) desc = desc.replace(d, "");
-      for (const n of nums) desc = desc.replace(n, "");
-      out.push({ bankId, date, description: desc.replace(/\s+/g, " ").trim().slice(0, 200), amount });
     }
+    if (cur) out.push(cur);
     return out;
   },
 };
 
 // ---------- VakıfBank ----------
-// Tipik satır: TARİH  AÇIKLAMA  TUTAR  BAKİYE  (Tutar +/- işaretli)
-const vakifbank: Parser = {
+// Başlık satırı: dd.mm.yyyy hh:mm <işlem no> <tutar±> <bakiye> <işlem adı>
+// Devam satırları başka bir başlığa kadar açıklamaya eklenir.
+const vakifbank: BankParser = {
   name: "VakıfBank",
-  match: (t) => /vak[ıi]fbank|vak[ıi]f\s?bank/i.test(t),
+  detect: (t) => /vak[ıi]fbank|vak[ıi]flar bankas/i.test(t),
   parse: ({ bankId, lines }) => {
-    const out: Omit<BankTx, "id">[] = [];
-    const dateRe = /\d{2}[./-]\d{2}[./-]\d{4}/g;
-    for (const cells of lines) {
-      const joined = cells.join(" ");
-      const dates = joined.match(dateRe);
-      if (!dates) continue;
-      const nums = joined.match(/-?[\d.]+,\d{2}/g) || [];
-      if (nums.length < 1) continue;
-      // Son 2 sayıdan ilki tutar (işaretli olabilir), ikincisi bakiye
-      const last = nums.slice(-2);
-      const amount = toNum(last[0]);
-      if (!amount) continue;
-      const date = toIsoDate(dates[0]);
-      let desc = joined;
-      for (const d of dates) desc = desc.replace(d, "");
-      for (const n of nums) desc = desc.replace(n, "");
-      out.push({ bankId, date, description: desc.replace(/\s+/g, " ").trim().slice(0, 200), amount });
+    const header = /^(\d{2}\.\d{2}\.\d{4})\s+\d{1,2}:\d{2}\s+(\d{6,})\s+(-?[\d.]+,\d{2})\s+(-?[\d.]+,\d{2})\s+(.*)$/;
+    const out: any[] = [];
+    let cur: any = null;
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line) continue;
+      const m = line.match(header);
+      if (m) {
+        if (cur) out.push(cur);
+        const amount = toNum(m[3]);
+        const işlem = m[5].trim();
+        cur = {
+          bankId,
+          date: toIso(m[1]),
+          amount,
+          refNo: m[2],
+          description: işlem,
+          category: classify(işlem, amount) || işlem.slice(0, 40),
+          note: `Bakiye: ${m[4]}`,
+        };
+      } else if (cur) {
+        cur.description = `${cur.description} — ${line}`
+          .replace(/\s+/g, " ").trim().slice(0, 400);
+      }
     }
+    if (cur) out.push(cur);
     return out;
   },
 };
 
 // ---------- Genel fallback ----------
-const generic: Parser = {
+const generic: BankParser = {
   name: "Genel",
-  match: () => true,
+  detect: () => true,
   parse: ({ bankId, lines }) => {
     const out: Omit<BankTx, "id">[] = [];
-    const dateRe = /\d{1,2}[./-]\d{1,2}[./-]\d{2,4}/;
-    for (const cells of lines) {
-      const joined = cells.join(" ");
-      const dm = joined.match(dateRe);
+    const anyDate = /\d{1,2}[./-]\d{1,2}[./-]\d{2,4}/;
+    for (const raw of lines) {
+      const line = raw.trim();
+      const dm = line.match(anyDate);
       if (!dm) continue;
-      const nm = joined.match(/-?[\d.]+,\d{2}|-?[\d.,]+\s*(TL|₺)?\s*$/i);
-      if (!nm) continue;
-      const amount = toNum(nm[0]);
+      const nums = line.match(/-?[\d.]+,\d{2}/g);
+      if (!nums || !nums.length) continue;
+      // İlk sayı tutar, varsa son sayı bakiye kabul edilir
+      const amount = toNum(nums[0]);
       if (!amount) continue;
-      const desc = joined.replace(dateRe, "").replace(/-?[\d.,]+\s*(TL|₺)?\s*$/i, "").trim().slice(0, 200);
-      out.push({ bankId, date: toIsoDate(dm[0]), description: desc || "—", amount });
+      let desc = line.replace(anyDate, "");
+      for (const n of nums) desc = desc.replace(n, "");
+      desc = desc.replace(/\s+/g, " ").trim().slice(0, 300);
+      out.push({
+        bankId,
+        date: toIso(dm[0]),
+        amount,
+        description: desc || "—",
+        category: classify(desc, amount) || undefined,
+      });
     }
     return out;
   },
 };
 
-const DETECTORS: Parser[] = [halkbank, vakifbank, generic];
+export const BANK_PARSERS: BankParser[] = [halkbank, vakifbank, generic];
 
-export function parseBankPdf(lines: string[][], bankId: string): { txs: Omit<BankTx, "id">[]; parser: string } {
-  const text = lines.map((l) => l.join(" ")).join("\n");
-  for (const p of DETECTORS) {
-    if (p.match(text)) {
-      const txs = p.parse({ bankId, text, lines });
+export function parseBankPdf(
+  lines: string[],
+  bankId: string,
+): { txs: Omit<BankTx, "id">[]; parser: string } {
+  const text = lines.join("\n");
+  for (const p of BANK_PARSERS) {
+    if (p.detect(text)) {
+      const txs = p.parse({ bankId, lines });
       if (txs.length) return { txs, parser: p.name };
     }
   }
