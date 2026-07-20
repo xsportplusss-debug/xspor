@@ -13,13 +13,21 @@ const ALLOWED_EMAIL = "xsportplusss@gmail.com";
 
 let syncInitialized = false;
 
+function isInAppBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  return /(FBAN|FBAV|Instagram|Line|Twitter|WhatsApp|Messenger|MicroMessenger|TikTok|Snapchat|LinkedInApp|OKApp|MiuiBrowser|; wv\))/i.test(ua);
+}
+
 export function AuthGate({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
+  const [currentEmail, setCurrentEmail] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     const handleSession = async (userId: string, email: string | undefined) => {
+      setCurrentEmail(email ?? null);
       if ((email ?? "").toLowerCase() !== ALLOWED_EMAIL) {
         if (!cancelled) setStatus("unauthorized");
         return;
@@ -43,6 +51,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       if (event === "SIGNED_IN" && session) handleSession(session.user.id, session.user.email);
       if (event === "SIGNED_OUT") {
         stopSync();
+        setCurrentEmail(null);
         setStatus("auth");
       }
     });
@@ -64,10 +73,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
     );
   }
 
-  if (status === "unauthorized") return <UnauthorizedScreen />;
+  if (status === "unauthorized") return <UnauthorizedScreen email={currentEmail} />;
   if (status === "auth") return <AuthScreen />;
   return <>{children}</>;
 }
+
 
 function UnauthorizedScreen() {
   const [busy, setBusy] = useState(false);
