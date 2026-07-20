@@ -63,8 +63,8 @@ const dedupKey = (bank_id: string, t: ParsedTx) =>
   `${bank_id}|${t.date}|${(t.ref_no || "").trim()}|${t.description.trim().toLowerCase()}|${t.debit.toFixed(2)}|${t.credit.toFixed(2)}`;
 
 function normalizeParsed(raw: any, source: string): ParsedTx {
-  const debit = raw.debit ?? (raw.amount < 0 ? -raw.amount : 0) ?? 0;
-  const credit = raw.credit ?? (raw.amount > 0 ? raw.amount : 0) ?? 0;
+  const debit = raw.debit ?? (raw.amount < 0 ? -raw.amount : 0);
+  const credit = raw.credit ?? (raw.amount > 0 ? raw.amount : 0);
   return {
     date: raw.date,
     description: raw.description ?? "",
