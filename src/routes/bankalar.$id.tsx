@@ -20,7 +20,7 @@ import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { fmt, type BankTx } from "@/lib/mock-data";
 import { useStore, bankBalance } from "@/lib/store";
-import { parseExcel, parsePdfLines, rowsToBankTx } from "@/lib/importers";
+import { parseExcel, parsePdfTextLines, rowsToBankTx } from "@/lib/importers";
 import { parseBankPdf } from "@/lib/bank-parsers";
 import { useSelection } from "@/hooks/use-selection";
 
