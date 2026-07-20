@@ -1,0 +1,13 @@
+# Fintra Ön Muhasebe
+
+> XSportPlus için geliştirilmiş, tamamen kimlik doğrulama ile korunan
+> özel bir ön muhasebe ve finans yönetim paneli.
+
+Fintra; satış/alış faturaları, cari hesaplar, ürünler, banka ekstreleri,
+kasa, gelir/gider takibi ve pazaryeri entegrasyonlarını tek panelde
+birleştirir. Uygulamanın tamamı yetkili kullanıcı girişi gerektirir;
+kamuya açık içerik bulunmaz.
+
+## Pages
+
+- [Giriş](/): Yetkili kullanıcı girişi ve panel anasayfası.

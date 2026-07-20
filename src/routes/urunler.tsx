@@ -213,10 +213,10 @@ function Page() {
                         <TableCell className="text-right font-semibold">{fmtTL(inc)}</TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => setEditing(p)}>
+                            <Button variant="ghost" size="icon" aria-label="Ürünü düzenle" onClick={() => setEditing(p)}>
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => { removeProduct(p.id); toast.success("Silindi"); }}>
+                            <Button variant="ghost" size="icon" aria-label="Ürünü sil" onClick={() => { removeProduct(p.id); toast.success("Silindi"); }}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </div>

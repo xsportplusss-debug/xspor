@@ -165,7 +165,7 @@ function Page() {
               <div className="mt-1 flex items-center gap-3">
                 <div className="grid h-16 w-16 shrink-0 place-items-center rounded-xl border bg-muted/40 overflow-hidden">
                   {form.logo_url ? (
-                    <img src={form.logo_url} alt="logo" className="h-full w-full object-contain" />
+                    <img src={form.logo_url} alt="Banka Logosu" className="h-full w-full object-contain" />
                   ) : (
                     <Landmark className="h-6 w-6 text-muted-foreground" />
                   )}
@@ -270,7 +270,7 @@ function Page() {
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border bg-muted/40 overflow-hidden">
                       {b.logo_url ? (
-                        <img src={b.logo_url} alt={b.name} className="h-full w-full object-contain" />
+                        <img src={b.logo_url} alt={`${b.name} Banka Logosu`} className="h-full w-full object-contain" />
                       ) : (
                         <Landmark className="h-6 w-6 text-muted-foreground" />
                       )}
