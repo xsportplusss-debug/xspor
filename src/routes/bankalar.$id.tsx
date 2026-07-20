@@ -20,7 +20,8 @@ import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { fmt, type BankTx } from "@/lib/mock-data";
 import { useStore, bankBalance } from "@/lib/store";
-import { parseExcel, parsePdfLines, rowsToBankTx, linesToBankTx } from "@/lib/importers";
+import { parseExcel, parsePdfLines, rowsToBankTx } from "@/lib/importers";
+import { parseBankPdf } from "@/lib/bank-parsers";
 import { useSelection } from "@/hooks/use-selection";
 
 export const Route = createFileRoute("/bankalar/$id")({
@@ -168,26 +169,18 @@ function Page() {
             <Button variant="outline" size="sm" onClick={() => setShowHistory((v) => !v)}>
               <History className="mr-1 h-4 w-4" /> Dosya Geçmişi {imports.length > 0 && `(${imports.length})`}
             </Button>
-            <BankImportButton bankId={id} kind="excel"
-              onDone={(txs, meta) => {
-                const existing = new Set(tx.map(dedupKey));
-                const fresh = txs.filter((x) => !existing.has(dedupKey(x)));
-                const importId = addImport({ ...meta, success: fresh.length, failed: txs.length - fresh.length });
-                bulkAddBankTx(fresh.map((x) => ({ ...x, importId })));
-                toast.success(`${fresh.length} hareket eklendi`, {
-                  description: `${txs.length - fresh.length} mükerrer atlandı · ${meta.fileName}`,
-                });
-              }} />
-            <BankImportButton bankId={id} kind="pdf"
-              onDone={(txs, meta) => {
-                const existing = new Set(tx.map(dedupKey));
-                const fresh = txs.filter((x) => !existing.has(dedupKey(x)));
-                const importId = addImport({ ...meta, success: fresh.length, failed: txs.length - fresh.length });
-                bulkAddBankTx(fresh.map((x) => ({ ...x, importId })));
-                toast.success(`${fresh.length} hareket PDF'ten alındı`, {
-                  description: `${txs.length - fresh.length} mükerrer atlandı · ${meta.fileName}`,
-                });
-              }} />
+            {(["excel", "csv", "pdf"] as const).map((k) => (
+              <BankImportButton key={k} bankId={id} kind={k}
+                onDone={(txs, meta, parserName) => {
+                  const existing = new Set(tx.map(dedupKey));
+                  const fresh = txs.filter((x) => !existing.has(dedupKey(x)));
+                  const importId = addImport({ ...meta, success: fresh.length, failed: txs.length - fresh.length });
+                  bulkAddBankTx(fresh.map((x) => ({ ...x, importId })));
+                  toast.success(`${fresh.length} hareket eklendi`, {
+                    description: `${txs.length - fresh.length} mükerrer atlandı · ${meta.fileName}${parserName ? ` · ${parserName}` : ""}`,
+                  });
+                }} />
+            ))}
             <Dialog open={openNew} onOpenChange={(v) => { setOpenNew(v); if (v) setForm(emptyForm()); }}>
               <DialogTrigger asChild>
                 <Button size="sm" className="gradient-primary text-primary-foreground shadow-elegant">
@@ -525,8 +518,12 @@ function BankImportButton({
   bankId, kind, onDone,
 }: {
   bankId: string;
-  kind: "excel" | "pdf";
-  onDone: (txs: Omit<BankTx, "id">[], meta: Omit<ImportMeta, "success" | "failed"> & { fileName: string }) => void;
+  kind: "excel" | "csv" | "pdf";
+  onDone: (
+    txs: Omit<BankTx, "id">[],
+    meta: Omit<ImportMeta, "success" | "failed"> & { fileName: string },
+    parserName?: string,
+  ) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -536,14 +533,15 @@ function BankImportButton({
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<FieldId, string>>({} as any);
   const [pdfPreview, setPdfPreview] = useState<Omit<BankTx, "id">[]>([]);
+  const [pdfParser, setPdfParser] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const reset = () => { setFile(null); setRows([]); setHeaders([]); setMapping({} as any); setPdfPreview([]); };
+  const reset = () => { setFile(null); setRows([]); setHeaders([]); setMapping({} as any); setPdfPreview([]); setPdfParser(""); };
 
   const handleFile = async (f: File) => {
     setLoading(true);
     try {
-      if (kind === "excel") {
+      if (kind === "excel" || kind === "csv") {
         const r = await parseExcel(f);
         const hs = r.length ? Object.keys(r[0]) : [];
         const m = {} as Record<FieldId, string>;
@@ -554,7 +552,9 @@ function BankImportButton({
         setRows(r); setHeaders(hs); setMapping(m); setFile(f);
       } else {
         const lines = await parsePdfLines(f);
-        setPdfPreview(linesToBankTx(lines, bankId));
+        const { txs, parser } = parseBankPdf(lines, bankId);
+        setPdfPreview(txs);
+        setPdfParser(parser);
         setFile(f);
       }
     } catch (e: any) {
@@ -581,7 +581,7 @@ function BankImportButton({
       ...t,
       refNo: mapped[i].ref ? String(mapped[i].ref) : undefined,
     }));
-    const ext = file.name.toLowerCase().endsWith(".csv") ? "csv"
+    const ext: "csv" | "xls" | "xlsx" = kind === "csv" || file.name.toLowerCase().endsWith(".csv") ? "csv"
       : file.name.toLowerCase().endsWith(".xls") ? "xls" : "xlsx";
     onDone(txs, { bankId, fileName: file.name, fileType: ext, importedAt: new Date().toISOString(), total: txs.length });
     setOpen(false); reset();
@@ -589,24 +589,22 @@ function BankImportButton({
 
   const applyPdf = () => {
     if (!file) return;
-    onDone(pdfPreview, { bankId, fileName: file.name, fileType: "pdf", importedAt: new Date().toISOString(), total: pdfPreview.length });
+    onDone(pdfPreview, { bankId, fileName: file.name, fileType: "pdf", importedAt: new Date().toISOString(), total: pdfPreview.length }, pdfParser);
     setOpen(false); reset();
   };
 
-  const accept = kind === "excel" ? ".xlsx,.xls,.csv" : "application/pdf";
+  const accept = kind === "excel" ? ".xlsx,.xls" : kind === "csv" ? ".csv" : "application/pdf";
+  const label = kind === "excel" ? "Excel Yükle" : kind === "csv" ? "CSV Yükle" : "PDF Yükle";
+  const icon = kind === "pdf" ? <FileText className="mr-1 h-4 w-4" /> : <FileSpreadsheet className="mr-1 h-4 w-4" />;
 
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          {kind === "excel"
-            ? <><FileSpreadsheet className="mr-1 h-4 w-4" /> Excel / CSV</>
-            : <><FileText className="mr-1 h-4 w-4" /> PDF Ekstre</>}
-        </Button>
+        <Button variant="outline" size="sm">{icon} {label}</Button>
       </DialogTrigger>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>{kind === "excel" ? "Banka Hareketlerini İçe Aktar (Excel/CSV)" : "Banka Ekstresi Yükle (PDF)"}</DialogTitle>
+          <DialogTitle>{kind === "pdf" ? "Banka Ekstresi Yükle (PDF)" : kind === "csv" ? "CSV Ekstre Aktarımı" : "Excel Ekstre Aktarımı"}</DialogTitle>
         </DialogHeader>
 
         {!file ? (
@@ -624,12 +622,12 @@ function BankImportButton({
             <Upload className="mb-2 h-8 w-8 text-muted-foreground" />
             <div className="text-sm font-medium">Dosyayı buraya sürükleyin veya tıklayın</div>
             <div className="mt-1 text-xs text-muted-foreground">
-              {kind === "excel" ? "Excel (.xlsx, .xls) veya CSV" : "Metin tabanlı PDF banka ekstresi"}
+              {kind === "excel" ? "Excel (.xlsx, .xls)" : kind === "csv" ? "CSV (.csv)" : "Metin tabanlı PDF banka ekstresi (Halkbank / VakıfBank / genel)"}
             </div>
             <input ref={inputRef} type="file" accept={accept} className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
           </div>
-        ) : kind === "excel" ? (
+        ) : kind !== "pdf" ? (
           <div className="space-y-3">
             <div className="text-xs text-muted-foreground">{file.name} · {rows.length} satır</div>
             <div className="grid gap-2 sm:grid-cols-2">
@@ -662,7 +660,7 @@ function BankImportButton({
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="text-xs text-muted-foreground">{file.name} · {pdfPreview.length} okunabilir hareket</div>
+            <div className="text-xs text-muted-foreground">{file.name} · {pdfPreview.length} okunabilir hareket {pdfParser && <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-primary">{pdfParser} formatı</span>}</div>
             <div className="max-h-72 overflow-auto rounded-md border">
               <Table>
                 <TableHeader><TableRow><TableHead>Tarih</TableHead><TableHead>Açıklama</TableHead><TableHead className="text-right">Tutar</TableHead></TableRow></TableHeader>
@@ -691,7 +689,7 @@ function BankImportButton({
             <>
               <Button variant="ghost" onClick={reset}>Dosyayı Değiştir</Button>
               <Button className="gradient-primary text-primary-foreground"
-                onClick={kind === "excel" ? applyExcel : applyPdf} disabled={loading}>
+                onClick={kind === "pdf" ? applyPdf : applyExcel} disabled={loading}>
                 Aktar
               </Button>
             </>

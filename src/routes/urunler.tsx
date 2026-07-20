@@ -34,7 +34,7 @@ export const Route = createFileRoute("/urunler")({
 
 const emptyForm = (): Omit<Product, "id"> => ({
   name: "", sku: "", barcode: "", category: "", brand: "", image: "",
-  price1: 0, currency: "TRY", tax: 20, buy: 0, sell: 0, vat: 20, stock: 0, minStock: 0,
+  price1: 0, currency: "TRY", tax: 20, buy: 0, sell: 0, vat: 20, stock: 0, minStock: 0, kur: 1,
 });
 
 const curSymbol = (c: Currency) => (c === "USD" ? "$" : c === "EUR" ? "€" : c === "GBP" ? "£" : "₺");
@@ -142,9 +142,24 @@ function Page() {
                 <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ad, marka, stok kodu, barkod, kategori..." className="pl-9" />
               </div>
               {sel.selectedIds.length > 0 && (
-                <Button variant="destructive" size="sm" onClick={bulkDelete}>
-                  <Trash2 className="mr-1 h-4 w-4" /> Seçilenleri Sil ({sel.selectedIds.length})
-                </Button>
+                <>
+                  <Button variant="outline" size="sm" onClick={() => {
+                    let n = 0;
+                    for (const id of sel.selectedIds) {
+                      const p = products.find((x) => x.id === id); if (!p) continue;
+                      const kur = p.kur || 1;
+                      const np1 = +((p.buy || 0) * (1 + (p.tax || 0) / 100) * kur).toFixed(2);
+                      updateProduct(id, { price1: np1, currency: "TRY", sell: np1, vat: p.tax });
+                      n++;
+                    }
+                    toast.success(`${n} ürünün fiyatı güncellendi`, { description: "Formül: Alış × KDV × Kur" });
+                  }}>
+                    <RefreshCw className="mr-1 h-4 w-4" /> Fiyatları Güncelle ({sel.selectedIds.length})
+                  </Button>
+                  <Button variant="destructive" size="sm" onClick={bulkDelete}>
+                    <Trash2 className="mr-1 h-4 w-4" /> Seçilenleri Sil ({sel.selectedIds.length})
+                  </Button>
+                </>
               )}
             </div>
             <div className="overflow-x-auto">
@@ -247,7 +262,12 @@ function ProductForm({ value, onChange, rates }: { value: any; onChange: (v: any
         <div><Label>Barkod</Label><Input value={value.barcode} onChange={(e) => set({ barcode: e.target.value })} /></div>
       </div>
       <div className="grid grid-cols-4 gap-2">
-        <div className="col-span-2"><Label>Toptan Fiyat (price1)</Label><Input type="number" value={value.price1 ?? 0} onChange={(e) => set({ price1: +e.target.value })} /></div>
+        <div><Label>Alış Fiyatı</Label><Input type="number" value={value.buy ?? 0} onChange={(e) => set({ buy: +e.target.value })} /></div>
+        <div><Label>KDV %</Label><Input type="number" value={value.tax ?? 20} onChange={(e) => set({ tax: +e.target.value })} /></div>
+        <div><Label>Kur (manuel)</Label><Input type="number" step="0.01" value={value.kur ?? 1} onChange={(e) => set({ kur: +e.target.value })} /></div>
+        <div><Label>Toptan (price1)</Label><Input type="number" value={value.price1 ?? 0} onChange={(e) => set({ price1: +e.target.value })} /></div>
+      </div>
+      <div className="grid grid-cols-4 gap-2">
         <div>
           <Label>Para Birimi</Label>
           <Select value={value.currency} onValueChange={(v) => set({ currency: v as Currency })}>
@@ -258,10 +278,16 @@ function ProductForm({ value, onChange, rates }: { value: any; onChange: (v: any
               <SelectItem value="EUR">€ EUR</SelectItem>
               <SelectItem value="GBP">£ GBP</SelectItem>
             </SelectContent>
-
           </Select>
         </div>
-        <div><Label>KDV %</Label><Input type="number" value={value.tax ?? 20} onChange={(e) => set({ tax: +e.target.value })} /></div>
+        <div className="col-span-3 flex items-end">
+          <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => {
+            const np1 = +((value.buy || 0) * (1 + (value.tax || 0) / 100) * (value.kur || 1)).toFixed(2);
+            set({ price1: np1, currency: "TRY" });
+          }}>
+            <RefreshCw className="mr-1 h-4 w-4" /> Fiyatları Güncelle · Alış × KDV × Kur
+          </Button>
+        </div>
       </div>
       <p className="text-xs text-muted-foreground">
         {value.currency !== "TRY" && <>Kur: 1 {value.currency} ≈ {(value.currency === "USD" ? rates.USD : value.currency === "EUR" ? rates.EUR : rates.GBP).toFixed(2)} ₺ · </>}
