@@ -550,6 +550,7 @@ function BankImportButton({
           if (g && !m[g]) m[g] = h;
         }
         setRows(r); setHeaders(hs); setMapping(m); setFile(f);
+        setOpen(true);
       } else {
         const lines = await parsePdfTextLines(f);
         const { txs, parser } = parseBankPdf(lines, bankId);
