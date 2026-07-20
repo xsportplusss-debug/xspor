@@ -79,7 +79,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 }
 
 
-function UnauthorizedScreen() {
+function UnauthorizedScreen({ email }: { email: string | null }) {
   const [busy, setBusy] = useState(false);
   const signOut = async () => {
     setBusy(true);
@@ -94,16 +94,22 @@ function UnauthorizedScreen() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-center text-sm text-muted-foreground">
-            Bu uygulamaya yalnızca yetkili hesap erişebilir. Lütfen doğru Google hesabıyla giriş yapın.
+            Bu uygulamaya yalnızca <b>{ALLOWED_EMAIL}</b> hesabı erişebilir.
           </p>
+          {email && (
+            <p className="text-center text-xs text-muted-foreground">
+              Şu an giriş yapılan hesap: <b>{email}</b>
+            </p>
+          )}
           <Button onClick={signOut} disabled={busy} className="w-full">
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Çıkış Yap"}
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Çıkış Yap & Farklı Hesapla Gir"}
           </Button>
         </CardContent>
       </Card>
     </div>
   );
 }
+
 
 
 function AuthScreen() {
