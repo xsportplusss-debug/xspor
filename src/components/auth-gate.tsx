@@ -7,6 +7,12 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
+function isInAppBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  return /(FBAN|FBAV|Instagram|Line|Twitter|WhatsApp|Messenger|MicroMessenger|TikTok|Snapchat|LinkedInApp|OKApp|MiuiBrowser|; wv\))/i.test(ua);
+}
+
 type Status = "loading" | "auth" | "unauthorized" | "ready";
 
 const ALLOWED_EMAIL = "xsportplusss@gmail.com";
