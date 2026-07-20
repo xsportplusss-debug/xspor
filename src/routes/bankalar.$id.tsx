@@ -600,39 +600,39 @@ function BankImportButton({
   const icon = kind === "pdf" ? <FileText className="mr-1 h-4 w-4" /> : <FileSpreadsheet className="mr-1 h-4 w-4" />;
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">{icon} {label}</Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>{kind === "pdf" ? "Banka Ekstresi Yükle (PDF)" : kind === "csv" ? "CSV Ekstre Aktarımı" : "Excel Ekstre Aktarımı"}</DialogTitle>
-        </DialogHeader>
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleFile(f);
+          e.target.value = "";
+        }}
+      />
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={loading}
+        onClick={() => inputRef.current?.click()}
+      >
+        {icon} {label}
+      </Button>
+      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {kind === "pdf" ? "Banka Ekstresi Önizleme (PDF)" : kind === "csv" ? "CSV Ekstre Önizleme" : "Excel Ekstre Önizleme"}
+            </DialogTitle>
+          </DialogHeader>
 
-        {!file ? (
-          <div
-            onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
-            onDragLeave={() => setDrag(false)}
-            onDrop={(e) => {
-              e.preventDefault(); setDrag(false);
-              const f = e.dataTransfer.files?.[0]; if (f) handleFile(f);
-            }}
-            onClick={() => inputRef.current?.click()}
-            className={`grid cursor-pointer place-items-center rounded-xl border-2 border-dashed p-10 text-center transition
-              ${drag ? "border-primary bg-primary/5" : "border-border hover:bg-muted/30"}`}
-          >
-            <Upload className="mb-2 h-8 w-8 text-muted-foreground" />
-            <div className="text-sm font-medium">Dosyayı buraya sürükleyin veya tıklayın</div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              {kind === "excel" ? "Excel (.xlsx, .xls)" : kind === "csv" ? "CSV (.csv)" : "Metin tabanlı PDF banka ekstresi (Halkbank / VakıfBank / genel)"}
-            </div>
-            <input ref={inputRef} type="file" accept={accept} className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
-          </div>
-        ) : kind !== "pdf" ? (
-          <div className="space-y-3">
-            <div className="text-xs text-muted-foreground">{file.name} · {rows.length} satır</div>
-            <div className="grid gap-2 sm:grid-cols-2">
+          {file && kind !== "pdf" ? (
+            <div className="space-y-3">
+              <div className="text-xs text-muted-foreground">{file.name} · {rows.length} satır</div>
+              <div className="grid gap-2 sm:grid-cols-2">
+
               {MAP_FIELDS.map((f) => (
                 <div key={f.id}>
                   <Label className="text-xs">{f.label}</Label>
