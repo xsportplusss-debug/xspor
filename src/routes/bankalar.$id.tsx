@@ -551,11 +551,12 @@ function BankImportButton({
         }
         setRows(r); setHeaders(hs); setMapping(m); setFile(f);
       } else {
-        const lines = await parsePdfLines(f);
+        const lines = await parsePdfTextLines(f);
         const { txs, parser } = parseBankPdf(lines, bankId);
         setPdfPreview(txs);
         setPdfParser(parser);
         setFile(f);
+        setOpen(true);
       }
     } catch (e: any) {
       toast.error("Dosya okunamadı", { description: e.message });
