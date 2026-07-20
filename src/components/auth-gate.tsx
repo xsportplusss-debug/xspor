@@ -13,13 +13,21 @@ const ALLOWED_EMAIL = "xsportplusss@gmail.com";
 
 let syncInitialized = false;
 
+function isInAppBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  return /(FBAN|FBAV|Instagram|Line|Twitter|WhatsApp|Messenger|MicroMessenger|TikTok|Snapchat|LinkedInApp|OKApp|MiuiBrowser|; wv\))/i.test(ua);
+}
+
 export function AuthGate({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
+  const [currentEmail, setCurrentEmail] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     const handleSession = async (userId: string, email: string | undefined) => {
+      setCurrentEmail(email ?? null);
       if ((email ?? "").toLowerCase() !== ALLOWED_EMAIL) {
         if (!cancelled) setStatus("unauthorized");
         return;
@@ -43,6 +51,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       if (event === "SIGNED_IN" && session) handleSession(session.user.id, session.user.email);
       if (event === "SIGNED_OUT") {
         stopSync();
+        setCurrentEmail(null);
         setStatus("auth");
       }
     });
@@ -64,12 +73,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
     );
   }
 
-  if (status === "unauthorized") return <UnauthorizedScreen />;
+  if (status === "unauthorized") return <UnauthorizedScreen email={currentEmail} />;
   if (status === "auth") return <AuthScreen />;
   return <>{children}</>;
 }
 
-function UnauthorizedScreen() {
+
+function UnauthorizedScreen({ email }: { email: string | null }) {
   const [busy, setBusy] = useState(false);
   const signOut = async () => {
     setBusy(true);
@@ -84,16 +94,22 @@ function UnauthorizedScreen() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-center text-sm text-muted-foreground">
-            Bu uygulamaya yalnızca yetkili hesap erişebilir. Lütfen doğru Google hesabıyla giriş yapın.
+            Bu uygulamaya yalnızca <b>{ALLOWED_EMAIL}</b> hesabı erişebilir.
           </p>
+          {email && (
+            <p className="text-center text-xs text-muted-foreground">
+              Şu an giriş yapılan hesap: <b>{email}</b>
+            </p>
+          )}
           <Button onClick={signOut} disabled={busy} className="w-full">
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Çıkış Yap"}
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Çıkış Yap & Farklı Hesapla Gir"}
           </Button>
         </CardContent>
       </Card>
     </div>
   );
 }
+
 
 
 function AuthScreen() {
@@ -120,6 +136,11 @@ function AuthScreen() {
           </p>
         </CardHeader>
         <CardContent className="space-y-4 pt-2">
+          {isInAppBrowser() && (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
+              Bu bağlantıyı uygulama içi tarayıcıda açtınız (Instagram, WhatsApp, Messenger vb.). Google güvenlik politikası bu tür tarayıcılarda girişi engelliyor. Lütfen sağ üstteki menüden <b>"Tarayıcıda Aç"</b> seçeneği ile Safari veya Chrome'da açın.
+            </div>
+          )}
           <Button onClick={signIn} disabled={busy} className="w-full" variant="outline">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : (
               <>
@@ -127,7 +148,11 @@ function AuthScreen() {
               </>
             )}
           </Button>
+          <p className="text-center text-[11px] text-muted-foreground">
+            Yetkili hesap: <b>{ALLOWED_EMAIL}</b>
+          </p>
         </CardContent>
+
       </Card>
     </div>
   );
