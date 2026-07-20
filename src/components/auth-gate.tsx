@@ -7,17 +7,12 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
-type Status = "loading" | "auth" | "hydrating" | "unauthorized" | "ready";
+type Status = "loading" | "auth" | "unauthorized" | "ready";
 
 const ALLOWED_EMAIL = "xsportplusss@gmail.com";
 
 let syncInitialized = false;
-
-function isInAppBrowser(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent || "";
-  return /(FBAN|FBAV|Instagram|Line|Twitter|WhatsApp|Messenger|MicroMessenger|TikTok|Snapchat|LinkedInApp|OKApp|MiuiBrowser|; wv\))/i.test(ua);
-}
+let cloudHydrated = false;
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
@@ -26,19 +21,27 @@ export function AuthGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    const handleSession = async (userId: string, email: string | undefined) => {
+    const handleSession = (userId: string, email: string | undefined) => {
       setCurrentEmail(email ?? null);
       if ((email ?? "").toLowerCase() !== ALLOWED_EMAIL) {
         if (!cancelled) setStatus("unauthorized");
         return;
       }
-      setStatus("hydrating");
-      await loadFromCloud(userId);
-      if (!syncInitialized) {
-        initAutoSync();
-        syncInitialized = true;
-      }
+      // Show the app immediately from the local (persisted) cache.
       if (!cancelled) setStatus("ready");
+
+      // Hydrate from cloud + start sync in the background so first paint is instant.
+      if (!cloudHydrated) {
+        cloudHydrated = true;
+        loadFromCloud(userId)
+          .catch((e) => console.error("cloud hydrate failed", e))
+          .finally(() => {
+            if (!syncInitialized) {
+              initAutoSync();
+              syncInitialized = true;
+            }
+          });
+      }
     };
 
     supabase.auth.getSession().then(({ data }) => {
@@ -51,6 +54,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       if (event === "SIGNED_IN" && session) handleSession(session.user.id, session.user.email);
       if (event === "SIGNED_OUT") {
         stopSync();
+        cloudHydrated = false;
         setCurrentEmail(null);
         setStatus("auth");
       }
@@ -62,12 +66,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  if (status === "loading" || status === "hydrating") {
+  if (status === "loading") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex items-center gap-3 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin" />
-          <span>{status === "hydrating" ? "Verileriniz yükleniyor..." : "Yükleniyor..."}</span>
+          <span>Yükleniyor...</span>
         </div>
       </div>
     );
