@@ -20,7 +20,7 @@ import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { fmt, type BankTx } from "@/lib/mock-data";
 import { useStore, bankBalance } from "@/lib/store";
-import { parseExcel, parsePdfLines, rowsToBankTx } from "@/lib/importers";
+import { parseExcel, parsePdfTextLines, rowsToBankTx } from "@/lib/importers";
 import { parseBankPdf } from "@/lib/bank-parsers";
 import { useSelection } from "@/hooks/use-selection";
 
@@ -550,12 +550,14 @@ function BankImportButton({
           if (g && !m[g]) m[g] = h;
         }
         setRows(r); setHeaders(hs); setMapping(m); setFile(f);
+        setOpen(true);
       } else {
-        const lines = await parsePdfLines(f);
+        const lines = await parsePdfTextLines(f);
         const { txs, parser } = parseBankPdf(lines, bankId);
         setPdfPreview(txs);
         setPdfParser(parser);
         setFile(f);
+        setOpen(true);
       }
     } catch (e: any) {
       toast.error("Dosya okunamadı", { description: e.message });
@@ -598,39 +600,39 @@ function BankImportButton({
   const icon = kind === "pdf" ? <FileText className="mr-1 h-4 w-4" /> : <FileSpreadsheet className="mr-1 h-4 w-4" />;
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">{icon} {label}</Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>{kind === "pdf" ? "Banka Ekstresi Yükle (PDF)" : kind === "csv" ? "CSV Ekstre Aktarımı" : "Excel Ekstre Aktarımı"}</DialogTitle>
-        </DialogHeader>
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleFile(f);
+          e.target.value = "";
+        }}
+      />
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={loading}
+        onClick={() => inputRef.current?.click()}
+      >
+        {icon} {label}
+      </Button>
+      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {kind === "pdf" ? "Banka Ekstresi Önizleme (PDF)" : kind === "csv" ? "CSV Ekstre Önizleme" : "Excel Ekstre Önizleme"}
+            </DialogTitle>
+          </DialogHeader>
 
-        {!file ? (
-          <div
-            onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
-            onDragLeave={() => setDrag(false)}
-            onDrop={(e) => {
-              e.preventDefault(); setDrag(false);
-              const f = e.dataTransfer.files?.[0]; if (f) handleFile(f);
-            }}
-            onClick={() => inputRef.current?.click()}
-            className={`grid cursor-pointer place-items-center rounded-xl border-2 border-dashed p-10 text-center transition
-              ${drag ? "border-primary bg-primary/5" : "border-border hover:bg-muted/30"}`}
-          >
-            <Upload className="mb-2 h-8 w-8 text-muted-foreground" />
-            <div className="text-sm font-medium">Dosyayı buraya sürükleyin veya tıklayın</div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              {kind === "excel" ? "Excel (.xlsx, .xls)" : kind === "csv" ? "CSV (.csv)" : "Metin tabanlı PDF banka ekstresi (Halkbank / VakıfBank / genel)"}
-            </div>
-            <input ref={inputRef} type="file" accept={accept} className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
-          </div>
-        ) : kind !== "pdf" ? (
-          <div className="space-y-3">
-            <div className="text-xs text-muted-foreground">{file.name} · {rows.length} satır</div>
-            <div className="grid gap-2 sm:grid-cols-2">
+          {file && kind !== "pdf" ? (
+            <div className="space-y-3">
+              <div className="text-xs text-muted-foreground">{file.name} · {rows.length} satır</div>
+              <div className="grid gap-2 sm:grid-cols-2">
+
               {MAP_FIELDS.map((f) => (
                 <div key={f.id}>
                   <Label className="text-xs">{f.label}</Label>
@@ -658,44 +660,44 @@ function BankImportButton({
               </div>
             </div>
           </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="text-xs text-muted-foreground">{file.name} · {pdfPreview.length} okunabilir hareket {pdfParser && <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-primary">{pdfParser} formatı</span>}</div>
-            <div className="max-h-72 overflow-auto rounded-md border">
-              <Table>
-                <TableHeader><TableRow><TableHead>Tarih</TableHead><TableHead>Açıklama</TableHead><TableHead className="text-right">Tutar</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {pdfPreview.slice(0, 30).map((t, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="text-xs">{t.date}</TableCell>
-                      <TableCell className="text-xs">{t.description}</TableCell>
-                      <TableCell className={`text-right text-xs ${t.amount >= 0 ? "text-success" : "text-destructive"}`}>{t.amount.toFixed(2)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            {pdfPreview.length === 0 && (
-              <div className="rounded-md bg-warning/10 p-3 text-xs text-warning">
-                Otomatik okunabilir satır bulunamadı. Manuel giriş yapabilir veya Excel'e çevirip tekrar deneyebilirsiniz.
+          ) : file && kind === "pdf" ? (
+            <div className="space-y-3">
+              <div className="text-xs text-muted-foreground">{file.name} · {pdfPreview.length} okunabilir hareket {pdfParser && <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-primary">{pdfParser} formatı</span>}</div>
+              <div className="max-h-72 overflow-auto rounded-md border">
+                <Table>
+                  <TableHeader><TableRow><TableHead>Tarih</TableHead><TableHead>Açıklama</TableHead><TableHead>Ref</TableHead><TableHead className="text-right">Tutar</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {pdfPreview.slice(0, 30).map((t, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-xs whitespace-nowrap">{t.date}</TableCell>
+                        <TableCell className="text-xs max-w-[420px] truncate">{t.description}</TableCell>
+                        <TableCell className="text-xs font-mono text-muted-foreground">{t.refNo || "—"}</TableCell>
+                        <TableCell className={`text-right text-xs ${t.amount >= 0 ? "text-success" : "text-destructive"}`}>{t.amount.toFixed(2)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
-            )}
-          </div>
-        )}
+              {pdfPreview.length === 0 && (
+                <div className="rounded-md bg-warning/10 p-3 text-xs text-warning">
+                  Otomatik okunabilir satır bulunamadı. PDF taranmış görüntü olabilir.
+                </div>
+              )}
+            </div>
+          ) : null}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => { setOpen(false); reset(); }} disabled={loading}>İptal</Button>
-          {file && (
-            <>
-              <Button variant="ghost" onClick={reset}>Dosyayı Değiştir</Button>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setOpen(false); reset(); }} disabled={loading}>İptal</Button>
+            {file && (
               <Button className="gradient-primary text-primary-foreground"
                 onClick={kind === "pdf" ? applyPdf : applyExcel} disabled={loading}>
-                Aktar
+                Aktar ({kind === "pdf" ? pdfPreview.length : rows.length})
               </Button>
-            </>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
+

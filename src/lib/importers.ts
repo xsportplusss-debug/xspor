@@ -36,6 +36,12 @@ export async function parsePdfLines(file: File): Promise<string[][]> {
   return rows;
 }
 
+/** PDF sayfalarındaki satırları birleştirilmiş metin dizisi olarak döner. */
+export async function parsePdfTextLines(file: File): Promise<string[]> {
+  const rows = await parsePdfLines(file);
+  return rows.map((r) => r.join(" ").replace(/\s+/g, " ").trim()).filter(Boolean);
+}
+
 const NUM = (v: any) => {
   if (v == null || v === "") return 0;
   if (typeof v === "number") return v;

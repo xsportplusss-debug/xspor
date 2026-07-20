@@ -253,7 +253,18 @@ export const useStore = create<State & Actions>()(
       resetAll: () => set(() => ({ ...initial })),
 
     }),
-    { name: "fintra:v1" },
+    {
+      name: "fintra:v1",
+      version: 2,
+      migrate: (state: any, version) => {
+        if (!state) return state;
+        if (version < 2) {
+          // Bankalar modülü sıfırlandı — sadece banka verileri temizleniyor.
+          return { ...state, banks: [], bankTx: [], bankImports: [] };
+        }
+        return state;
+      },
+    },
   ),
 );
 
