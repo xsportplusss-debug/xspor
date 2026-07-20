@@ -143,7 +143,48 @@ export function AppSidebar() {
         {renderGroup("Faturalar", salesItems)}
         {renderGroup("Cari", cariItems)}
         {renderGroup("Stok", stockItems)}
-        {renderGroup("Finans", financeItems)}
+
+        <SidebarGroup>
+          {!collapsed && <SidebarGroupLabel>Finans</SidebarGroupLabel>}
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <Collapsible defaultOpen={pathname.startsWith("/bankalar")} className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton tooltip="Bankalar" isActive={pathname.startsWith("/bankalar")}>
+                      <Landmark className="h-4 w-4" />
+                      <span>Bankalar</span>
+                      <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {bankSubItems.map((mi) => (
+                        <SidebarMenuSubItem key={mi.url}>
+                          <SidebarMenuSubButton asChild isActive={isActive(mi.url)}>
+                            <Link to={mi.url}>
+                              <span>{mi.title}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+              {financeItems.map((it) => (
+                <SidebarMenuItem key={it.url}>
+                  <SidebarMenuButton asChild isActive={isActive(it.url)} tooltip={it.title}>
+                    <Link to={it.url}>
+                      <it.icon className="h-4 w-4" />
+                      <span>{it.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
         <SidebarGroup>
           {!collapsed && <SidebarGroupLabel>Pazaryerleri</SidebarGroupLabel>}
