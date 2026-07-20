@@ -17,7 +17,7 @@ import { useStore, bankBalance } from "@/lib/store";
 import { EmptyState } from "@/components/empty-state";
 import { Badge } from "@/components/ui/badge";
 
-export const Route = createFileRoute("/bankalar")({
+export const Route = createFileRoute("/bankalar/hesaplar")({
   head: () => ({
     meta: [
       { title: "Bankalar — Fintra" },
