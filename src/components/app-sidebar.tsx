@@ -61,8 +61,12 @@ const stockItems = [
   { title: "Ürünler", url: "/urunler", icon: Package },
 ];
 
+const bankSubItems = [
+  { title: "Banka Ekle", url: "/bankalar/hesaplar" },
+  { title: "Banka Ekstreleri", url: "/bankalar/ekstreler" },
+];
+
 const financeItems = [
-  { title: "Bankalar", url: "/bankalar", icon: Landmark },
   { title: "Kasa", url: "/kasa", icon: Wallet },
   { title: "Gelirler", url: "/gelirler", icon: TrendingUp },
   { title: "Giderler", url: "/giderler", icon: TrendingDown },
