@@ -142,9 +142,9 @@ const generic: BankParser = {
       if (!dm) continue;
       const nums = line.match(/-?[\d.]+,\d{2}/g);
       if (!nums || !nums.length) continue;
-      // İlk sayı tutar, varsa son sayı bakiye kabul edilir
       const amount = toNum(nums[0]);
       if (!amount) continue;
+      const balance = nums.length > 1 ? toNum(nums[nums.length - 1]) : undefined;
       let desc = line.replace(anyDate, "");
       for (const n of nums) desc = desc.replace(n, "");
       desc = desc.replace(/\s+/g, " ").trim().slice(0, 300);
@@ -152,8 +152,13 @@ const generic: BankParser = {
         bankId,
         date: toIso(dm[0]),
         amount,
+        debit: amount < 0 ? -amount : undefined,
+        credit: amount > 0 ? amount : undefined,
+        balance,
         description: desc || "—",
         category: classify(desc, amount) || undefined,
+        source: "PDF",
+        status: "Yeni",
       });
     }
     return out;
