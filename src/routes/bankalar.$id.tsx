@@ -660,44 +660,44 @@ function BankImportButton({
               </div>
             </div>
           </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="text-xs text-muted-foreground">{file.name} · {pdfPreview.length} okunabilir hareket {pdfParser && <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-primary">{pdfParser} formatı</span>}</div>
-            <div className="max-h-72 overflow-auto rounded-md border">
-              <Table>
-                <TableHeader><TableRow><TableHead>Tarih</TableHead><TableHead>Açıklama</TableHead><TableHead className="text-right">Tutar</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {pdfPreview.slice(0, 30).map((t, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="text-xs">{t.date}</TableCell>
-                      <TableCell className="text-xs">{t.description}</TableCell>
-                      <TableCell className={`text-right text-xs ${t.amount >= 0 ? "text-success" : "text-destructive"}`}>{t.amount.toFixed(2)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            {pdfPreview.length === 0 && (
-              <div className="rounded-md bg-warning/10 p-3 text-xs text-warning">
-                Otomatik okunabilir satır bulunamadı. Manuel giriş yapabilir veya Excel'e çevirip tekrar deneyebilirsiniz.
+          ) : file && kind === "pdf" ? (
+            <div className="space-y-3">
+              <div className="text-xs text-muted-foreground">{file.name} · {pdfPreview.length} okunabilir hareket {pdfParser && <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-primary">{pdfParser} formatı</span>}</div>
+              <div className="max-h-72 overflow-auto rounded-md border">
+                <Table>
+                  <TableHeader><TableRow><TableHead>Tarih</TableHead><TableHead>Açıklama</TableHead><TableHead>Ref</TableHead><TableHead className="text-right">Tutar</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {pdfPreview.slice(0, 30).map((t, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-xs whitespace-nowrap">{t.date}</TableCell>
+                        <TableCell className="text-xs max-w-[420px] truncate">{t.description}</TableCell>
+                        <TableCell className="text-xs font-mono text-muted-foreground">{t.refNo || "—"}</TableCell>
+                        <TableCell className={`text-right text-xs ${t.amount >= 0 ? "text-success" : "text-destructive"}`}>{t.amount.toFixed(2)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
-            )}
-          </div>
-        )}
+              {pdfPreview.length === 0 && (
+                <div className="rounded-md bg-warning/10 p-3 text-xs text-warning">
+                  Otomatik okunabilir satır bulunamadı. PDF taranmış görüntü olabilir.
+                </div>
+              )}
+            </div>
+          ) : null}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => { setOpen(false); reset(); }} disabled={loading}>İptal</Button>
-          {file && (
-            <>
-              <Button variant="ghost" onClick={reset}>Dosyayı Değiştir</Button>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setOpen(false); reset(); }} disabled={loading}>İptal</Button>
+            {file && (
               <Button className="gradient-primary text-primary-foreground"
                 onClick={kind === "pdf" ? applyPdf : applyExcel} disabled={loading}>
-                Aktar
+                Aktar ({kind === "pdf" ? pdfPreview.length : rows.length})
               </Button>
-            </>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
+
