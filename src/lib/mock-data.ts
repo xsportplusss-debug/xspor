@@ -73,24 +73,7 @@ export type BankTx = {
   description: string;
   category?: string;
   amount: number; // + giriş, - çıkış
-  refNo?: string;
-  note?: string;
-  cariId?: string;
-  importId?: string;
 };
-
-export type BankImportRecord = {
-  id: string;
-  bankId: string;
-  fileName: string;
-  fileType: "xlsx" | "xls" | "csv" | "pdf";
-  importedAt: string;
-  user?: string;
-  total: number;
-  success: number;
-  failed: number;
-};
-
 
 export type CashRegister = {
   id: string;
