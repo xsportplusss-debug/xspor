@@ -20,8 +20,8 @@ import { Badge } from "@/components/ui/badge";
 export const Route = createFileRoute("/bankalar/hesaplar")({
   head: () => ({
     meta: [
-      { title: "Bankalar — Fintra" },
-      { name: "description", content: "Banka hesapları ve hareketleri." },
+      { title: "Banka Ekle — Fintra" },
+      { name: "description", content: "Banka hesabı tanımlama ve yönetimi." },
     ],
   }),
   component: Page,
