@@ -518,8 +518,12 @@ function BankImportButton({
   bankId, kind, onDone,
 }: {
   bankId: string;
-  kind: "excel" | "pdf";
-  onDone: (txs: Omit<BankTx, "id">[], meta: Omit<ImportMeta, "success" | "failed"> & { fileName: string }) => void;
+  kind: "excel" | "csv" | "pdf";
+  onDone: (
+    txs: Omit<BankTx, "id">[],
+    meta: Omit<ImportMeta, "success" | "failed"> & { fileName: string },
+    parserName?: string,
+  ) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -529,14 +533,15 @@ function BankImportButton({
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<FieldId, string>>({} as any);
   const [pdfPreview, setPdfPreview] = useState<Omit<BankTx, "id">[]>([]);
+  const [pdfParser, setPdfParser] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const reset = () => { setFile(null); setRows([]); setHeaders([]); setMapping({} as any); setPdfPreview([]); };
+  const reset = () => { setFile(null); setRows([]); setHeaders([]); setMapping({} as any); setPdfPreview([]); setPdfParser(""); };
 
   const handleFile = async (f: File) => {
     setLoading(true);
     try {
-      if (kind === "excel") {
+      if (kind === "excel" || kind === "csv") {
         const r = await parseExcel(f);
         const hs = r.length ? Object.keys(r[0]) : [];
         const m = {} as Record<FieldId, string>;
@@ -547,7 +552,9 @@ function BankImportButton({
         setRows(r); setHeaders(hs); setMapping(m); setFile(f);
       } else {
         const lines = await parsePdfLines(f);
-        setPdfPreview(linesToBankTx(lines, bankId));
+        const { txs, parser } = parseBankPdf(lines, bankId);
+        setPdfPreview(txs);
+        setPdfParser(parser);
         setFile(f);
       }
     } catch (e: any) {
@@ -574,7 +581,7 @@ function BankImportButton({
       ...t,
       refNo: mapped[i].ref ? String(mapped[i].ref) : undefined,
     }));
-    const ext = file.name.toLowerCase().endsWith(".csv") ? "csv"
+    const ext: "csv" | "xls" | "xlsx" = kind === "csv" || file.name.toLowerCase().endsWith(".csv") ? "csv"
       : file.name.toLowerCase().endsWith(".xls") ? "xls" : "xlsx";
     onDone(txs, { bankId, fileName: file.name, fileType: ext, importedAt: new Date().toISOString(), total: txs.length });
     setOpen(false); reset();
@@ -582,20 +589,18 @@ function BankImportButton({
 
   const applyPdf = () => {
     if (!file) return;
-    onDone(pdfPreview, { bankId, fileName: file.name, fileType: "pdf", importedAt: new Date().toISOString(), total: pdfPreview.length });
+    onDone(pdfPreview, { bankId, fileName: file.name, fileType: "pdf", importedAt: new Date().toISOString(), total: pdfPreview.length }, pdfParser);
     setOpen(false); reset();
   };
 
-  const accept = kind === "excel" ? ".xlsx,.xls,.csv" : "application/pdf";
+  const accept = kind === "excel" ? ".xlsx,.xls" : kind === "csv" ? ".csv" : "application/pdf";
+  const label = kind === "excel" ? "Excel Yükle" : kind === "csv" ? "CSV Yükle" : "PDF Yükle";
+  const icon = kind === "pdf" ? <FileText className="mr-1 h-4 w-4" /> : <FileSpreadsheet className="mr-1 h-4 w-4" />;
 
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          {kind === "excel"
-            ? <><FileSpreadsheet className="mr-1 h-4 w-4" /> Excel / CSV</>
-            : <><FileText className="mr-1 h-4 w-4" /> PDF Ekstre</>}
-        </Button>
+        <Button variant="outline" size="sm">{icon} {label}</Button>
       </DialogTrigger>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
