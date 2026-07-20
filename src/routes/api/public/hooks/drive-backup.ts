@@ -83,12 +83,29 @@ async function runBackup() {
   return { uploaded, count: uploaded.length, date: stamp };
 }
 
+function timingSafeEqualStr(a: string, b: string): boolean {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+function isAuthorized(provided: string | null | undefined): boolean {
+  const expected = process.env.BACKUP_CRON_SECRET;
+  if (!expected || !provided) return false;
+  return timingSafeEqualStr(provided, expected);
+}
+
 export const Route = createFileRoute("/api/public/hooks/drive-backup")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const apikey = request.headers.get("apikey") ?? "";
-        if (apikey !== process.env.SUPABASE_PUBLISHABLE_KEY) {
+        const provided =
+          request.headers.get("x-backup-secret") ??
+          request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
+          "";
+        if (!isAuthorized(provided)) {
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
             headers: { "Content-Type": "application/json" },
@@ -108,8 +125,11 @@ export const Route = createFileRoute("/api/public/hooks/drive-backup")({
         }
       },
       GET: async ({ request }) => {
-        const apikey = new URL(request.url).searchParams.get("apikey") ?? "";
-        if (apikey !== process.env.SUPABASE_PUBLISHABLE_KEY) {
+        const provided =
+          request.headers.get("x-backup-secret") ??
+          request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
+          "";
+        if (!isAuthorized(provided)) {
           return new Response("Unauthorized", { status: 401 });
         }
         try {
