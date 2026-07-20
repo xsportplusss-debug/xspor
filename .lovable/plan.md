@@ -1,54 +1,62 @@
 
-# Fintra Genişletme Planı
+# Bankalar Modülü — Yeniden Tasarım
 
-Mevcut sistem korunacak. Hiçbir tablo, route veya store alanı silinmeyecek. Tüm yenilikler **modüler** ve **ek** olarak gelecek. Gerçek API bağlantıları şimdilik yok — servis katmanı hazır, mock ile çalışır, ileride kolayca gerçek API'ye bağlanır.
+Bankalar iki alt-sayfaya bölünür. Diğer modüller değişmez; store/tipler/parser'lar korunur.
 
-## 1. Servis Katmanı (yeni)
-- `src/services/e-invoice/` — E-Fatura servisi (mock adapter + interface)
-- `src/services/marketplaces/` — her pazaryeri için ayrı adapter (Trendyol, Hepsiburada, N11, Amazon, Pazarama, ÇiçekSepeti, PTTAVM, idefix, Turkcell Pasaj) — ortak `MarketplaceAdapter` arayüzü
-- Gelecekte gerçek `fetch` çağrıları bu dosyalara eklenecek.
+## Sidebar
+`Bankalar` alt-menülü olur:
+- **Banka Ekle** → `/bankalar/hesaplar`
+- **Banka Ekstreleri** → `/bankalar/ekstreler`
 
-## 2. Store Genişletmeleri (kırılmadan)
-`src/lib/store.ts` içine yeni alanlar eklenir, eskiler dokunulmaz:
-- `eInvoiceConfig`, `eInvoiceLastSync`
-- `marketplaceConfigs: Record<string, {...}>`
-- `marketplaceOrders: MarketplaceOrder[]`
-- `cashTx.category` (opsiyonel yeni alan)
-- `banks.active` (opsiyonel — pasif/aktif)
-- Invoice tipine opsiyonel `source: "manual" | "e-invoice"` + `uuid` (duplicate kontrolü)
+`/bankalar` → `/bankalar/hesaplar` yönlendirmesi.
 
-## 3. Yeni Rotalar
-- `/e-fatura-entegrasyon` — Config formu, "Bağlantıyı Test Et", "Faturaları Çek", son senkron tarihi
-- `/pazaryerleri/ayarlar` — Her pazaryeri için API config kartı, "Bağlı" rozeti, "Siparişleri Çek"
-- Mevcut pazaryeri sayfalarına yeni pazaryerleri eklenir (ÇiçekSepeti, PTTAVM, idefix, Turkcell Pasaj) — mevcutlar aynı kalır
+## 1) Banka Ekle — `/bankalar/hesaplar`
+Sadece hesap tanımlama.
 
-## 4. Modül İyileştirmeleri
-- **Bankalar**: Pasif yap, Düzenle, kartta Toplam Gelen/Giden/Son Hareket/Adet. CSV import eklenir (Excel/PDF zaten var).
-- **Ürünler**: Kur alanı UI'dan kaldırılır (mevcut veriler bozulmaz, alan opsiyonel kalır). Yeni Ürün formu sadeleşir.
-- **Fiyat Teklifi**: Para birimi seçimi USD/EUR/GBP/TL genişletilir, kur teklif özelinde çalışır (zaten benzer, GBP eklenir).
-- **Kasa**: Nakit Giriş/Çıkış dialoglarına kategori seçici (Yemek, Yakıt, Kargo, Market, Personel, Ofis, Reklam, Diğer).
-- **Gelirler / Giderler**: Mevcut sayfalar zenginleştirilir — kaynak filtresi (Banka/Kasa/Pazaryeri/Diğer), kategori renk kodları, toplam kart.
-- **Dashboard**: Yeni kartlar (Bugünkü Ciro/Tahsilat/Gider, Bekleyen Tahsilat/Borç, Pazaryeri Siparişleri, Net Kâr, E-Fatura yeşil rozet).
+- Tablo: Banka Adı, Şube, IBAN, Hesap No, Döviz, Hesap Türü, Açılış Bakiyesi, Durum, İşlem.
+- Butonlar: **Yeni Banka**, satır bazında **Düzenle** / **Sil** (hareketi olan silinemez), Aktif/Pasif switch, form içinde **Kaydet**.
+- Form alanları: Banka Adı, Şube, IBAN, Hesap No, **Hesap Türü** (Vadesiz/Vadeli/Kredi/POS), Döviz (TRY/USD/EUR/GBP/CHF), Başlangıç Bakiyesi, Açıklama, Aktif/Pasif.
+- Mevcut renkli özet kartları korunur; tablo/kart geçiş toggle'ı.
 
-## 5. Entegrasyon
-- Pazaryeri siparişleri çekildiğinde otomatik `bankTx` benzeri hareket + `marketplaceOrders` kaydı → Gelir/Gider/Dashboard otomatik yansır.
-- E-Fatura çekimi → mevcut `salesInvoices`/`purchaseInvoices` içine UUID/no bazlı duplicate check ile eklenir, `source: "e-invoice"` etiketi.
-- Kasa/Banka hareketleri zaten Gelir/Gider'e yansıyor; kategori bilgisi de aktarılır.
+## 2) Banka Ekstreleri — `/bankalar/ekstreler`
+Tüm bankaların hareketleri tek ekranda.
 
-## 6. Dokunulmayacaklar
-- Supabase şeması (user_data JSON blob — genişleme otomatik)
-- Auth akışı, Drive yedek, mevcut Excel/PDF importerlar
-- Mevcut route yolları ve isimleri
-- localStorage anahtarı `fintra:v1`
+### Üst — Özet Kartları
+Toplam Borç, Toplam Alacak, Toplam İşlem, Son Bakiye (filtreye göre canlı).
 
-## Uygulama Sırası
-1. Store + tip genişletmeleri
-2. Servis katmanı iskeleti (mock)
-3. E-Fatura rotası
-4. Pazaryeri config rotası + yeni pazaryeri sayfaları
-5. Kasa kategori, Ürünler UI sadeleştirme, GBP
-6. Bankalar kart metrikleri + pasif
-7. Gelir/Gider zenginleştirme
-8. Dashboard yeni kartlar
+### Yükleme Barı
+- **Banka seçici** (Select) — önce banka.
+- İki buton: **PDF Yükle**, **Excel Yükle** (.xlsx/.xls/.csv). Sürükle-bırak yok; `<input type="file">` + `click()`.
+- Yükleme sonrası önizleme dialog'u: parser adı, satır sayısı, mükerrer sayısı; **Aktar** / **İptal**.
+- Mükerrer kontrolü: `bankId+date+description+amount+refNo`. Ayrıca `fileName+bankId+rowCount` → aynı ekstre uyarısı, yine de içe aktarma seçeneği.
 
-Onaylarsan sırayla uygulamaya başlıyorum.
+### Otomatik Ayrıştırma
+- **PDF**: mevcut `BANK_PARSERS` (Halkbank, VakıfBank, generic) genişletilir — çıktıya `debit/credit/balance/currency/refNo`.
+- **Excel/CSV**: `src/lib/importers.ts` içine `parseBankExcel()` — başlık satırını otomatik bulur, TR/EN eşleme: Tarih, Açıklama, Dekont Açıklaması, Referans, Borç, Alacak, Tutar, Bakiye, Döviz.
+- `BankTx` tipine opsiyonel alanlar: `debit`, `credit`, `balance`, `currency`, `status ("Yeni"|"Muhasebeleştirildi"|"Eşleşti")`. Geriye dönük: `amount = credit - debit`.
+
+### Hareketler Tablosu
+Sütunlar: Tarih, Açıklama, Ref No, Borç, Alacak, Bakiye, Döviz, Kaynak (PDF/Excel/CSV/Manuel), Durum.
+
+- Sayfalama 25/50/100 + sütun sıralama.
+- Satır aksiyonu: durum değiştir, düzenle, sil.
+- **Excel'e Dışa Aktar** butonu.
+
+### Filtreler + Arama
+Tarih aralığı, Banka (multi), Döviz, Sadece Borç / Sadece Alacak, Durum, canlı arama (açıklama+refNo).
+
+### Dosya Geçmişi
+Collapsible panel. Sütunlar: Dosya Adı, Banka, Tarih, İşlem Sayısı, Durum. Aksiyonlar: **Aç** (o dosyanın hareketlerine filtre), **Yeniden İşle** (cascade delete + yeniden yükleme istemi), **Sil** (cascade — `importId` eşleşen hareketleri kaldırır).
+
+## Teknik Notlar
+**Değişen/yeni dosyalar:**
+- `src/lib/mock-data.ts` — `BankTx` ve `Bank`'e opsiyonel alanlar.
+- `src/lib/bank-parsers.ts` — çıktı zenginleştirilir.
+- `src/lib/importers.ts` — `parseBankExcel()`.
+- `src/routes/bankalar.tsx` — `/bankalar/hesaplar`'a redirect.
+- `src/routes/bankalar.hesaplar.tsx` — hesap yönetimi (mevcut UI uyarlanır).
+- `src/routes/bankalar.ekstreler.tsx` — yeni ekstre/hareket sayfası.
+- `src/components/app-sidebar.tsx` — Bankalar alt-menüsü.
+- `src/routes/bankalar.$id.tsx` — korunur; Hesaplar'dan linklenir.
+
+**Store:** Mevcut `banks/bankTx/bankImports` + eylemler yeterli — migration yok.

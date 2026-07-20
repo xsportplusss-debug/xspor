@@ -53,7 +53,7 @@ const halkbank: BankParser = {
   detect: (t) => /halkbank|halk bankas|türkiye halk/i.test(t),
   parse: ({ bankId, lines }) => {
     const header = /^(\d{2}-\d{2}-\d{4})\s+(-?[\d.]+,\d{2})\s+(-?[\d.]+,\d{2})\s+(.*)$/;
-    const out: (Omit<BankTx, "id"> & { balance?: number })[] = [];
+    const out: any[] = [];
     let cur: any = null;
     for (const raw of lines) {
       const line = raw.trim();
@@ -62,14 +62,19 @@ const halkbank: BankParser = {
       if (m) {
         if (cur) out.push(cur);
         const amount = toNum(m[2]);
+        const balance = toNum(m[3]);
         const desc = m[4].trim();
         cur = {
           bankId,
           date: toIso(m[1]),
           amount,
+          debit: amount < 0 ? -amount : undefined,
+          credit: amount > 0 ? amount : undefined,
+          balance,
           description: desc,
           category: classify(desc, amount) || undefined,
-          note: `Bakiye: ${m[3]}`,
+          source: "PDF" as const,
+          status: "Yeni" as const,
         };
       } else if (cur) {
         cur.description = `${cur.description} ${line}`.replace(/\s+/g, " ").trim();
@@ -85,8 +90,6 @@ const halkbank: BankParser = {
 };
 
 // ---------- VakıfBank ----------
-// Başlık satırı: dd.mm.yyyy hh:mm <işlem no> <tutar±> <bakiye> <işlem adı>
-// Devam satırları başka bir başlığa kadar açıklamaya eklenir.
 const vakifbank: BankParser = {
   name: "VakıfBank",
   detect: (t) => /vak[ıi]fbank|vak[ıi]flar bankas/i.test(t),
@@ -101,15 +104,20 @@ const vakifbank: BankParser = {
       if (m) {
         if (cur) out.push(cur);
         const amount = toNum(m[3]);
+        const balance = toNum(m[4]);
         const işlem = m[5].trim();
         cur = {
           bankId,
           date: toIso(m[1]),
           amount,
+          debit: amount < 0 ? -amount : undefined,
+          credit: amount > 0 ? amount : undefined,
+          balance,
           refNo: m[2],
           description: işlem,
           category: classify(işlem, amount) || işlem.slice(0, 40),
-          note: `Bakiye: ${m[4]}`,
+          source: "PDF" as const,
+          status: "Yeni" as const,
         };
       } else if (cur) {
         cur.description = `${cur.description} — ${line}`
@@ -134,9 +142,9 @@ const generic: BankParser = {
       if (!dm) continue;
       const nums = line.match(/-?[\d.]+,\d{2}/g);
       if (!nums || !nums.length) continue;
-      // İlk sayı tutar, varsa son sayı bakiye kabul edilir
       const amount = toNum(nums[0]);
       if (!amount) continue;
+      const balance = nums.length > 1 ? toNum(nums[nums.length - 1]) : undefined;
       let desc = line.replace(anyDate, "");
       for (const n of nums) desc = desc.replace(n, "");
       desc = desc.replace(/\s+/g, " ").trim().slice(0, 300);
@@ -144,8 +152,13 @@ const generic: BankParser = {
         bankId,
         date: toIso(dm[0]),
         amount,
+        debit: amount < 0 ? -amount : undefined,
+        credit: amount > 0 ? amount : undefined,
+        balance,
         description: desc || "—",
         category: classify(desc, amount) || undefined,
+        source: "PDF",
+        status: "Yeni",
       });
     }
     return out;

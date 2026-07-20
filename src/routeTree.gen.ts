@@ -38,6 +38,8 @@ import { Route as PazaryerleriCiceksepetiRouteImport } from './routes/pazaryerle
 import { Route as PazaryerleriAyarlarRouteImport } from './routes/pazaryerleri.ayarlar'
 import { Route as PazaryerleriAmazonRouteImport } from './routes/pazaryerleri.amazon'
 import { Route as KasaIdRouteImport } from './routes/kasa.$id'
+import { Route as BankalarHesaplarRouteImport } from './routes/bankalar.hesaplar'
+import { Route as BankalarEkstrelerRouteImport } from './routes/bankalar.ekstreler'
 import { Route as BankalarIdRouteImport } from './routes/bankalar.$id'
 import { Route as ApiPublicHooksDriveBackupRouteImport } from './routes/api/public/hooks/drive-backup'
 
@@ -187,6 +189,16 @@ const KasaIdRoute = KasaIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => KasaRoute,
 } as any)
+const BankalarHesaplarRoute = BankalarHesaplarRouteImport.update({
+  id: '/hesaplar',
+  path: '/hesaplar',
+  getParentRoute: () => BankalarRoute,
+} as any)
+const BankalarEkstrelerRoute = BankalarEkstrelerRouteImport.update({
+  id: '/ekstreler',
+  path: '/ekstreler',
+  getParentRoute: () => BankalarRoute,
+} as any)
 const BankalarIdRoute = BankalarIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -219,6 +231,8 @@ export interface FileRoutesByFullPath {
   '/takvim': typeof TakvimRoute
   '/urunler': typeof UrunlerRoute
   '/bankalar/$id': typeof BankalarIdRoute
+  '/bankalar/ekstreler': typeof BankalarEkstrelerRoute
+  '/bankalar/hesaplar': typeof BankalarHesaplarRoute
   '/kasa/$id': typeof KasaIdRoute
   '/pazaryerleri/amazon': typeof PazaryerleriAmazonRoute
   '/pazaryerleri/ayarlar': typeof PazaryerleriAyarlarRoute
@@ -252,6 +266,8 @@ export interface FileRoutesByTo {
   '/takvim': typeof TakvimRoute
   '/urunler': typeof UrunlerRoute
   '/bankalar/$id': typeof BankalarIdRoute
+  '/bankalar/ekstreler': typeof BankalarEkstrelerRoute
+  '/bankalar/hesaplar': typeof BankalarHesaplarRoute
   '/kasa/$id': typeof KasaIdRoute
   '/pazaryerleri/amazon': typeof PazaryerleriAmazonRoute
   '/pazaryerleri/ayarlar': typeof PazaryerleriAyarlarRoute
@@ -286,6 +302,8 @@ export interface FileRoutesById {
   '/takvim': typeof TakvimRoute
   '/urunler': typeof UrunlerRoute
   '/bankalar/$id': typeof BankalarIdRoute
+  '/bankalar/ekstreler': typeof BankalarEkstrelerRoute
+  '/bankalar/hesaplar': typeof BankalarHesaplarRoute
   '/kasa/$id': typeof KasaIdRoute
   '/pazaryerleri/amazon': typeof PazaryerleriAmazonRoute
   '/pazaryerleri/ayarlar': typeof PazaryerleriAyarlarRoute
@@ -321,6 +339,8 @@ export interface FileRouteTypes {
     | '/takvim'
     | '/urunler'
     | '/bankalar/$id'
+    | '/bankalar/ekstreler'
+    | '/bankalar/hesaplar'
     | '/kasa/$id'
     | '/pazaryerleri/amazon'
     | '/pazaryerleri/ayarlar'
@@ -354,6 +374,8 @@ export interface FileRouteTypes {
     | '/takvim'
     | '/urunler'
     | '/bankalar/$id'
+    | '/bankalar/ekstreler'
+    | '/bankalar/hesaplar'
     | '/kasa/$id'
     | '/pazaryerleri/amazon'
     | '/pazaryerleri/ayarlar'
@@ -387,6 +409,8 @@ export interface FileRouteTypes {
     | '/takvim'
     | '/urunler'
     | '/bankalar/$id'
+    | '/bankalar/ekstreler'
+    | '/bankalar/hesaplar'
     | '/kasa/$id'
     | '/pazaryerleri/amazon'
     | '/pazaryerleri/ayarlar'
@@ -638,6 +662,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KasaIdRouteImport
       parentRoute: typeof KasaRoute
     }
+    '/bankalar/hesaplar': {
+      id: '/bankalar/hesaplar'
+      path: '/hesaplar'
+      fullPath: '/bankalar/hesaplar'
+      preLoaderRoute: typeof BankalarHesaplarRouteImport
+      parentRoute: typeof BankalarRoute
+    }
+    '/bankalar/ekstreler': {
+      id: '/bankalar/ekstreler'
+      path: '/ekstreler'
+      fullPath: '/bankalar/ekstreler'
+      preLoaderRoute: typeof BankalarEkstrelerRouteImport
+      parentRoute: typeof BankalarRoute
+    }
     '/bankalar/$id': {
       id: '/bankalar/$id'
       path: '/$id'
@@ -657,10 +695,14 @@ declare module '@tanstack/react-router' {
 
 interface BankalarRouteChildren {
   BankalarIdRoute: typeof BankalarIdRoute
+  BankalarEkstrelerRoute: typeof BankalarEkstrelerRoute
+  BankalarHesaplarRoute: typeof BankalarHesaplarRoute
 }
 
 const BankalarRouteChildren: BankalarRouteChildren = {
   BankalarIdRoute: BankalarIdRoute,
+  BankalarEkstrelerRoute: BankalarEkstrelerRoute,
+  BankalarHesaplarRoute: BankalarHesaplarRoute,
 }
 
 const BankalarRouteWithChildren = BankalarRoute._addFileChildren(
@@ -711,13 +753,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

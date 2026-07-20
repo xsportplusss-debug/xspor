@@ -65,6 +65,7 @@ export type Bank = {
   color: string;
   active?: boolean; // pasif yapıldıysa false
   accountName?: string;
+  accountType?: string; // Vadesiz/Vadeli/Kredi/POS
   branchName?: string;
   branchCode?: string;
   accountNumber?: string;
@@ -72,6 +73,7 @@ export type Bank = {
   description?: string;
 };
 
+export type BankTxStatus = "Yeni" | "Muhasebeleştirildi" | "Eşleşti";
 
 export type BankTx = {
   id: string;
@@ -79,11 +81,17 @@ export type BankTx = {
   date: string;
   description: string;
   category?: string;
-  amount: number; // + giriş, - çıkış
+  amount: number; // + giriş, - çıkış (geriye dönük uyum: credit - debit)
+  debit?: number;
+  credit?: number;
+  balance?: number;
+  currency?: string;
   refNo?: string;
   note?: string;
   cariId?: string;
   importId?: string;
+  source?: "PDF" | "Excel" | "CSV" | "Manuel";
+  status?: BankTxStatus;
 };
 
 export type BankImportRecord = {
@@ -96,6 +104,7 @@ export type BankImportRecord = {
   total: number;
   success: number;
   failed: number;
+  parserName?: string;
 };
 
 
