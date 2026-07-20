@@ -604,7 +604,7 @@ function BankImportButton({
       </DialogTrigger>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>{kind === "excel" ? "Banka Hareketlerini İçe Aktar (Excel/CSV)" : "Banka Ekstresi Yükle (PDF)"}</DialogTitle>
+          <DialogTitle>{kind === "pdf" ? "Banka Ekstresi Yükle (PDF)" : kind === "csv" ? "CSV Ekstre Aktarımı" : "Excel Ekstre Aktarımı"}</DialogTitle>
         </DialogHeader>
 
         {!file ? (
@@ -622,12 +622,12 @@ function BankImportButton({
             <Upload className="mb-2 h-8 w-8 text-muted-foreground" />
             <div className="text-sm font-medium">Dosyayı buraya sürükleyin veya tıklayın</div>
             <div className="mt-1 text-xs text-muted-foreground">
-              {kind === "excel" ? "Excel (.xlsx, .xls) veya CSV" : "Metin tabanlı PDF banka ekstresi"}
+              {kind === "excel" ? "Excel (.xlsx, .xls)" : kind === "csv" ? "CSV (.csv)" : "Metin tabanlı PDF banka ekstresi (Halkbank / VakıfBank / genel)"}
             </div>
             <input ref={inputRef} type="file" accept={accept} className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
           </div>
-        ) : kind === "excel" ? (
+        ) : kind !== "pdf" ? (
           <div className="space-y-3">
             <div className="text-xs text-muted-foreground">{file.name} · {rows.length} satır</div>
             <div className="grid gap-2 sm:grid-cols-2">
