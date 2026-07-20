@@ -12,4 +12,11 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  nitro: {
+    // Netlify's configured publish directory is dist/client; the netlify nitro
+    // preset defaults publicDir to dist, so pin it to keep the two in sync.
+    output: {
+      publicDir: "dist/client",
+    },
+  },
 });
