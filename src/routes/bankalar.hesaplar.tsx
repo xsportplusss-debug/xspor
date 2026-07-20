@@ -5,17 +5,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Landmark, Plus, Power, Trash2, Pencil, Eraser, ListOrdered } from "lucide-react";
-import { useMemo, useState } from "react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Landmark, Plus, Trash2, Pencil, ImagePlus, ListOrdered } from "lucide-react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { fmt, type Bank } from "@/lib/mock-data";
-import { useStore, bankBalance } from "@/lib/store";
 import { EmptyState } from "@/components/empty-state";
-import { Badge } from "@/components/ui/badge";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  listBanks, createBank, updateBank, deleteBank,
+  fileToDataUrl, MAX_LOGO_BYTES, type BankRow,
+} from "@/lib/bank-db";
 
 export const Route = createFileRoute("/bankalar/hesaplar")({
   head: () => ({
@@ -27,118 +32,177 @@ export const Route = createFileRoute("/bankalar/hesaplar")({
   component: Page,
 });
 
-const COLORS = ["#00A651", "#0055A4", "#004990", "#E30613", "#7B2CBF", "#F27A1A"];
 const CURRENCIES = ["TRY", "USD", "EUR", "GBP", "CHF"];
-const ACCOUNT_TYPES = ["Vadesiz", "Vadeli", "Kredi", "POS", "Döviz"];
 
-
-type FormState = Omit<Bank, "id">;
+type FormState = {
+  name: string;
+  logo_url: string | null;
+  iban: string;
+  account_name: string;
+  currency: string;
+  description: string;
+};
 
 const emptyForm: FormState = {
-  name: "", short: "", iban: "", currency: "TRY", balance: 0, color: COLORS[0], active: true,
-  accountName: "", accountType: "Vadesiz",
-  branchName: "", branchCode: "", accountNumber: "",
-  openingDate: new Date().toISOString().slice(0, 10), description: "",
+  name: "", logo_url: null, iban: "", account_name: "",
+  currency: "TRY", description: "",
 };
 
 function Page() {
-  const banks = useStore((s) => s.banks);
-  const bankTx = useStore((s) => s.bankTx);
-  const addBank = useStore((s) => s.addBank);
-  const removeBank = useStore((s) => s.removeBank);
-  const updateBank = useStore((s) => s.updateBank);
-  const bulkAddBankTx = useStore((s) => s.bulkAddBankTx);
-  const addBankImport = useStore((s) => s.addBankImport);
-  const bulkRemoveBankTx = useStore((s) => s.bulkRemoveBankTx);
-
-  const metrics = useMemo(() => {
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const monthStr = todayStr.slice(0, 7);
-    const m: Record<string, { in: number; out: number; todayIn: number; todayOut: number; monthIn: number; monthOut: number; last: string; count: number }> = {};
-    for (const b of banks) m[b.id] = { in: 0, out: 0, todayIn: 0, todayOut: 0, monthIn: 0, monthOut: 0, last: "", count: 0 };
-    for (const t of bankTx) {
-      const x = m[t.bankId]; if (!x) continue;
-      x.count++;
-      const isIn = t.amount >= 0;
-      const abs = Math.abs(t.amount);
-      if (isIn) x.in += abs; else x.out += abs;
-      if (t.date === todayStr) { if (isIn) x.todayIn += abs; else x.todayOut += abs; }
-      if (t.date.startsWith(monthStr)) { if (isIn) x.monthIn += abs; else x.monthOut += abs; }
-      if (!x.last || t.date > x.last) x.last = t.date;
-    }
-    return m;
-  }, [banks, bankTx]);
+  const qc = useQueryClient();
+  const { data: banks = [], isLoading } = useQuery({
+    queryKey: ["banks"],
+    queryFn: listBanks,
+  });
 
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [confirmDelete, setConfirmDelete] = useState<BankRow | null>(null);
+  const logoRef = useRef<HTMLInputElement>(null);
 
   const openNew = () => { setEditId(null); setForm(emptyForm); setOpen(true); };
-  const openEdit = (b: Bank) => {
+  const openEdit = (b: BankRow) => {
     setEditId(b.id);
-    setForm({ ...emptyForm, ...b });
+    setForm({
+      name: b.name,
+      logo_url: b.logo_url,
+      iban: b.iban ?? "",
+      account_name: b.account_name ?? "",
+      currency: b.currency,
+      description: b.description ?? "",
+    });
     setOpen(true);
   };
 
+  const createMut = useMutation({
+    mutationFn: (v: FormState) => createBank({
+      name: v.name.trim(),
+      logo_url: v.logo_url,
+      iban: v.iban.trim() || null,
+      account_name: v.account_name.trim() || null,
+      currency: v.currency,
+      description: v.description.trim() || null,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["banks"] });
+      toast.success("Banka eklendi");
+      setOpen(false);
+    },
+    onError: (e: any) => toast.error("Kaydedilemedi", { description: e?.message }),
+  });
+
+  const updateMut = useMutation({
+    mutationFn: ({ id, v }: { id: string; v: FormState }) => updateBank(id, {
+      name: v.name.trim(),
+      logo_url: v.logo_url,
+      iban: v.iban.trim() || null,
+      account_name: v.account_name.trim() || null,
+      currency: v.currency,
+      description: v.description.trim() || null,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["banks"] });
+      toast.success("Banka güncellendi");
+      setOpen(false);
+    },
+    onError: (e: any) => toast.error("Güncellenemedi", { description: e?.message }),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => deleteBank(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["banks"] });
+      qc.invalidateQueries({ queryKey: ["bank-tx"] });
+      qc.invalidateQueries({ queryKey: ["bank-imports"] });
+      toast.success("Banka silindi");
+      setConfirmDelete(null);
+    },
+    onError: (e: any) => toast.error("Silinemedi", { description: e?.message }),
+  });
+
   const save = () => {
     if (!form.name.trim()) return toast.error("Banka adı girin");
-    if (editId) {
-      updateBank(editId, form);
-      toast.success("Banka güncellendi");
-    } else {
-      addBank(form);
-      toast.success("Banka eklendi");
+    if (editId) updateMut.mutate({ id: editId, v: form });
+    else createMut.mutate(form);
+  };
+
+  const onLogoPick = async (file: File) => {
+    if (file.size > MAX_LOGO_BYTES) {
+      toast.error("Logo 512 KB'den küçük olmalı");
+      return;
     }
-    setOpen(false);
-    setEditId(null);
-    setForm(emptyForm);
-  };
-
-  const tryRemove = (b: Bank) => {
-    const hasTx = bankTx.some((t) => t.bankId === b.id);
-    if (hasTx) return toast.error("Bu bankada hareket var — önce hareketleri silmelisiniz");
-    if (confirm(`${b.name} silinsin mi?`)) removeBank(b.id);
-  };
-
-  const clearBankTx = (b: Bank) => {
-    const ids = bankTx.filter((t) => t.bankId === b.id).map((t) => t.id);
-    if (ids.length === 0) return toast.info("Bu bankada hareket yok");
-    if (!confirm(`${b.name} — ${ids.length} hareketin tamamı silinsin mi?`)) return;
-    bulkRemoveBankTx(ids);
-    toast.success(`${ids.length} hareket silindi`);
+    if (!/^image\/(png|jpeg|jpg|svg\+xml)$/.test(file.type)) {
+      toast.error("Sadece PNG, JPG veya SVG yükleyin");
+      return;
+    }
+    try {
+      const url = await fileToDataUrl(file);
+      setForm((f) => ({ ...f, logo_url: url }));
+    } catch (e: any) {
+      toast.error("Logo okunamadı", { description: e?.message });
+    }
   };
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Bankalar"
+        title="Banka Ekle"
         subtitle={`${banks.length} hesap`}
         actions={
           <Button size="sm" className="gradient-primary text-primary-foreground shadow-elegant" onClick={openNew}>
-            <Plus className="mr-1 h-4 w-4" /> Yeni Banka Ekle
+            <Plus className="mr-1 h-4 w-4" /> Yeni Banka
           </Button>
-        
         }
       />
 
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setEditId(null); setForm(emptyForm); } }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{editId ? "Bankayı Düzenle" : "Yeni Banka Ekle"}</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{editId ? "Bankayı Düzenle" : "Yeni Banka"}</DialogTitle></DialogHeader>
           <div className="grid gap-3">
-            <div className="grid grid-cols-3 gap-2">
-              <div className="col-span-2"><Label>Banka Adı *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-              <div><Label>Kısaltma</Label><Input value={form.short} onChange={(e) => setForm({ ...form, short: e.target.value.toUpperCase() })} /></div>
+            <div>
+              <Label>Logo</Label>
+              <div className="mt-1 flex items-center gap-3">
+                <div className="grid h-16 w-16 shrink-0 place-items-center rounded-xl border bg-muted/40 overflow-hidden">
+                  {form.logo_url ? (
+                    <img src={form.logo_url} alt="logo" className="h-full w-full object-contain" />
+                  ) : (
+                    <Landmark className="h-6 w-6 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={() => logoRef.current?.click()}>
+                    <ImagePlus className="mr-1 h-4 w-4" /> Logo Seç
+                  </Button>
+                  {form.logo_url && (
+                    <Button type="button" size="sm" variant="ghost" onClick={() => setForm({ ...form, logo_url: null })}>
+                      Kaldır
+                    </Button>
+                  )}
+                  <input
+                    ref={logoRef} type="file" accept="image/png,image/jpeg,image/svg+xml" className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) onLogoPick(f); e.target.value = ""; }}
+                  />
+                </div>
+              </div>
+              <div className="mt-1 text-[11px] text-muted-foreground">PNG, JPG veya SVG · maks 512 KB</div>
             </div>
+
+            <div>
+              <Label>Banka Adı *</Label>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </div>
+
+            <div>
+              <Label>IBAN</Label>
+              <Input value={form.iban} onChange={(e) => setForm({ ...form, iban: e.target.value.toUpperCase() })} placeholder="TR.." />
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
-              <div><Label>Hesap Adı</Label><Input value={form.accountName} onChange={(e) => setForm({ ...form, accountName: e.target.value })} /></div>
-              <div><Label>Hesap Numarası</Label><Input value={form.accountNumber} onChange={(e) => setForm({ ...form, accountNumber: e.target.value })} /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div><Label>Şube Adı</Label><Input value={form.branchName} onChange={(e) => setForm({ ...form, branchName: e.target.value })} /></div>
-              <div><Label>Şube Kodu</Label><Input value={form.branchCode} onChange={(e) => setForm({ ...form, branchCode: e.target.value })} /></div>
-            </div>
-            <div><Label>IBAN</Label><Input value={form.iban} onChange={(e) => setForm({ ...form, iban: e.target.value.toUpperCase() })} /></div>
-            <div className="grid grid-cols-4 gap-2">
+              <div>
+                <Label>Hesap Adı</Label>
+                <Input value={form.account_name} onChange={(e) => setForm({ ...form, account_name: e.target.value })} />
+              </div>
               <div>
                 <Label>Para Birimi</Label>
                 <select
@@ -149,119 +213,97 @@ function Page() {
                   {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-              <div>
-                <Label>Hesap Türü</Label>
-                <select
-                  className="mt-1 h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
-                  value={form.accountType || "Vadesiz"}
-                  onChange={(e) => setForm({ ...form, accountType: e.target.value })}
-                >
-                  {ACCOUNT_TYPES.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div><Label>Başlangıç Bakiyesi</Label><Input type="number" value={form.balance} onChange={(e) => setForm({ ...form, balance: +e.target.value })} /></div>
-              <div><Label>Açılış Tarihi</Label><Input type="date" value={form.openingDate} onChange={(e) => setForm({ ...form, openingDate: e.target.value })} /></div>
             </div>
-            <div><Label>Açıklama</Label><Textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+
             <div>
-              <Label>Renk</Label>
-              <div className="mt-1 flex gap-2">
-                {COLORS.map((c) => (
-                  <button key={c} type="button" onClick={() => setForm({ ...form, color: c })}
-                    className={`h-8 w-8 rounded-lg ring-2 ${form.color === c ? "ring-foreground" : "ring-transparent"}`}
-                    style={{ backgroundColor: c }} />
-                ))}
-              </div>
-            </div>
-            <div className="flex items-center gap-3 rounded-md border p-3">
-              <Switch checked={form.active !== false} onCheckedChange={(v) => setForm({ ...form, active: v })} />
-              <div className="text-sm">
-                <div className="font-medium">{form.active !== false ? "Aktif" : "Pasif"}</div>
-                <div className="text-xs text-muted-foreground">Pasif hesaplar listede soluk görünür.</div>
-              </div>
+              <Label>Açıklama</Label>
+              <Textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>İptal</Button>
-            <Button onClick={save} className="gradient-primary text-primary-foreground">Kaydet</Button>
+            <Button
+              onClick={save}
+              className="gradient-primary text-primary-foreground"
+              disabled={createMut.isPending || updateMut.isPending}
+            >
+              {createMut.isPending || updateMut.isPending ? "Kaydediliyor..." : "Kaydet"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {banks.length === 0 ? (
-        <EmptyState icon={Landmark} title="Henüz banka hesabı yok" desc="Yeni hesap ekleyin, ardından hareket girin veya ekstre içe aktarın." />
+      <AlertDialog open={!!confirmDelete} onOpenChange={(v) => !v && setConfirmDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bu bankayı silmek istediğinize emin misiniz?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <b>{confirmDelete?.name}</b> ile birlikte tüm ekstre dosyaları ve hareketleri kalıcı olarak silinecek.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Vazgeç</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmDelete && deleteMut.mutate(confirmDelete.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Sil
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {isLoading ? (
+        <div className="p-8 text-center text-sm text-muted-foreground">Yükleniyor...</div>
+      ) : banks.length === 0 ? (
+        <EmptyState
+          icon={Landmark}
+          title="Henüz banka hesabı yok"
+          desc="Yeni bir banka ekleyin, ardından Banka Ekstreleri sayfasından ekstre yükleyin."
+        />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {banks.map((b) => {
-            const active = b.active !== false;
-            const mm = metrics[b.id];
-            return (
-              <Card key={b.id} className={`glass overflow-hidden ${active ? "" : "opacity-60"}`}>
-                <div className="h-1.5" style={{ backgroundColor: b.color }} />
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between">
-                    <div className="grid h-11 w-11 place-items-center rounded-xl text-white" style={{ backgroundColor: b.color }}>
-                      <Landmark className="h-5 w-5" />
+          {banks.map((b) => (
+            <Card key={b.id} className="glass overflow-hidden">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border bg-muted/40 overflow-hidden">
+                      {b.logo_url ? (
+                        <img src={b.logo_url} alt={b.name} className="h-full w-full object-contain" />
+                      ) : (
+                        <Landmark className="h-6 w-6 text-muted-foreground" />
+                      )}
                     </div>
-                    <div className="flex items-center gap-1">
-                      {!active && <Badge variant="outline" className="text-[10px]">Pasif</Badge>}
-                      <Button variant="ghost" size="icon" title="Düzenle" onClick={() => openEdit(b)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" title={active ? "Pasif Yap" : "Aktif Yap"}
-                        onClick={() => updateBank(b.id, { active: !active })}>
-                        <Power className={`h-4 w-4 ${active ? "text-success" : "text-muted-foreground"}`} />
-                      </Button>
-                      <Button variant="ghost" size="icon" title="Hareketleri Sil" onClick={() => clearBankTx(b)}>
-                        <Eraser className="h-4 w-4 text-warning" />
-                      </Button>
-                      <Button variant="ghost" size="icon" title="Bankayı Sil" onClick={() => tryRemove(b)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                    <div className="min-w-0">
+                      <div className="truncate text-base font-semibold">{b.name}</div>
+                      <div className="text-xs text-muted-foreground">{b.currency}</div>
                     </div>
                   </div>
-                  <div className="mt-3 text-base font-semibold">{b.name}</div>
-                  {b.accountName && <div className="text-xs text-muted-foreground">{b.accountName}</div>}
-                  <div className="mt-1 text-xs font-mono text-muted-foreground truncate">{b.iban || "—"}</div>
-                  {(b.branchName || b.branchCode) && (
-                    <div className="text-[11px] text-muted-foreground">
-                      {b.branchName || "Şube"}{b.branchCode ? ` · ${b.branchCode}` : ""}
-                    </div>
-                  )}
-                  <div className="mt-4 text-xs text-muted-foreground">Güncel Bakiye</div>
-                  <div className="text-2xl font-bold tracking-tight">{fmt(bankBalance(b.id), b.currency)}</div>
-
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-                    <div className="rounded-md bg-success/10 p-2">
-                      <div className="text-muted-foreground">Bugün Gelen</div>
-                      <div className="font-semibold text-success">{fmt(mm.todayIn, b.currency)}</div>
-                    </div>
-                    <div className="rounded-md bg-destructive/10 p-2">
-                      <div className="text-muted-foreground">Bugün Giden</div>
-                      <div className="font-semibold text-destructive">{fmt(mm.todayOut, b.currency)}</div>
-                    </div>
-                    <div className="rounded-md bg-success/10 p-2">
-                      <div className="text-muted-foreground">Bu Ay Gelen</div>
-                      <div className="font-semibold text-success">{fmt(mm.monthIn, b.currency)}</div>
-                    </div>
-                    <div className="rounded-md bg-destructive/10 p-2">
-                      <div className="text-muted-foreground">Bu Ay Giden</div>
-                      <div className="font-semibold text-destructive">{fmt(mm.monthOut, b.currency)}</div>
-                    </div>
-                  </div>
-                  <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
-                    <span>Son: {mm.last || "—"}</span>
-                    <span>{mm.count} hareket</span>
-                  </div>
-                  <Link to="/bankalar/$id" params={{ id: b.id }}>
-                    <Button size="sm" className="mt-4 w-full gradient-primary text-primary-foreground">
-                      <ListOrdered className="mr-1 h-4 w-4" /> Hareketleri Gör ({mm.count})
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" title="Düzenle" onClick={() => openEdit(b)}>
+                      <Pencil className="h-4 w-4" />
                     </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            );
-          })}
+                    <Button variant="ghost" size="icon" title="Sil" onClick={() => setConfirmDelete(b)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+                {b.account_name && (
+                  <div className="mt-3 text-xs text-muted-foreground">{b.account_name}</div>
+                )}
+                <div className="mt-1 text-xs font-mono text-muted-foreground truncate">{b.iban || "—"}</div>
+                {b.description && (
+                  <div className="mt-2 text-xs text-muted-foreground line-clamp-2">{b.description}</div>
+                )}
+                <Link to="/bankalar/ekstreler" search={{ bank: b.id } as any}>
+                  <Button size="sm" variant="outline" className="mt-4 w-full">
+                    <ListOrdered className="mr-1 h-4 w-4" /> Hareketleri Gör
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
     </div>

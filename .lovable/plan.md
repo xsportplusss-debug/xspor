@@ -1,62 +1,58 @@
 
-# Bankalar Modülü — Yeniden Tasarım
+# Bankalar Modülü — Supabase Kalıcı Veritabanı ile Yeniden Tasarım
 
-Bankalar iki alt-sayfaya bölünür. Diğer modüller değişmez; store/tipler/parser'lar korunur.
+Bankalar iki alt menüye ayrılır ve tüm veriler Supabase'de (Lovable Cloud) saklanır — hangi cihazdan girersen gir aynı verileri görürsün. Diğer modüller (Faturalar, Ürünler, Kasa, Cari vb.) değişmez.
 
-## Sidebar
-`Bankalar` alt-menülü olur:
-- **Banka Ekle** → `/bankalar/hesaplar`
-- **Banka Ekstreleri** → `/bankalar/ekstreler`
+## 1) Veritabanı — 3 yeni tablo + Storage bucket
 
-`/bankalar` → `/bankalar/hesaplar` yönlendirmesi.
+**`banks`** — banka hesap tanımları
+name, logo_url, iban, account_name, currency, description, user_id.
 
-## 1) Banka Ekle — `/bankalar/hesaplar`
-Sadece hesap tanımlama.
+**`bank_imports`** — yüklenen ekstre dosyaları
+bank_id (FK→banks cascade), file_name, file_type, parser, tx_count, uploaded_at, user_id.
 
-- Tablo: Banka Adı, Şube, IBAN, Hesap No, Döviz, Hesap Türü, Açılış Bakiyesi, Durum, İşlem.
-- Butonlar: **Yeni Banka**, satır bazında **Düzenle** / **Sil** (hareketi olan silinemez), Aktif/Pasif switch, form içinde **Kaydet**.
-- Form alanları: Banka Adı, Şube, IBAN, Hesap No, **Hesap Türü** (Vadesiz/Vadeli/Kredi/POS), Döviz (TRY/USD/EUR/GBP/CHF), Başlangıç Bakiyesi, Açıklama, Aktif/Pasif.
-- Mevcut renkli özet kartları korunur; tablo/kart geçiş toggle'ı.
+**`bank_transactions`** — banka hareketleri
+bank_id (FK→banks cascade), import_id (FK→bank_imports cascade, nullable=manuel), date, description, ref_no, debit, credit, balance, currency, source (PDF/Excel/CSV/Manuel), user_id.
+Mükerrer koruması: UNIQUE(user_id, bank_id, date, description, debit, credit, ref_no).
 
-## 2) Banka Ekstreleri — `/bankalar/ekstreler`
-Tüm bankaların hareketleri tek ekranda.
+**Storage bucket `bank-logos`** — public read; upload/delete `auth.uid()` sahibine kısıtlı.
 
-### Üst — Özet Kartları
-Toplam Borç, Toplam Alacak, Toplam İşlem, Son Bakiye (filtreye göre canlı).
+Tüm tablolarda RLS + `auth.uid() = user_id` politikaları + `updated_at` trigger.
 
-### Yükleme Barı
-- **Banka seçici** (Select) — önce banka.
-- İki buton: **PDF Yükle**, **Excel Yükle** (.xlsx/.xls/.csv). Sürükle-bırak yok; `<input type="file">` + `click()`.
-- Yükleme sonrası önizleme dialog'u: parser adı, satır sayısı, mükerrer sayısı; **Aktar** / **İptal**.
-- Mükerrer kontrolü: `bankId+date+description+amount+refNo`. Ayrıca `fileName+bankId+rowCount` → aynı ekstre uyarısı, yine de içe aktarma seçeneği.
+## 2) `/bankalar/hesaplar` — Banka Ekle
 
-### Otomatik Ayrıştırma
-- **PDF**: mevcut `BANK_PARSERS` (Halkbank, VakıfBank, generic) genişletilir — çıktıya `debit/credit/balance/currency/refNo`.
-- **Excel/CSV**: `src/lib/importers.ts` içine `parseBankExcel()` — başlık satırını otomatik bulur, TR/EN eşleme: Tarih, Açıklama, Dekont Açıklaması, Referans, Borç, Alacak, Tutar, Bakiye, Döviz.
-- `BankTx` tipine opsiyonel alanlar: `debit`, `credit`, `balance`, `currency`, `status ("Yeni"|"Muhasebeleştirildi"|"Eşleşti")`. Geriye dönük: `amount = credit - debit`.
+- Form: **Banka Adı**, **Logo** (PNG/JPG/SVG bilgisayardan yüklenir → Storage), **IBAN**, **Hesap Adı**, **Para Birimi** (TRY/USD/EUR/GBP/CHF), **Açıklama**.
+- Butonlar: **Yeni Banka**, **Kaydet**, **Düzenle**, **Sil** ("Bu bankayı silmek istediğinize emin misiniz?" AlertDialog → onaylanınca cascade delete).
+- Kart görünümü: logo + banka adı + IBAN + para birimi.
+- Anlık Supabase CRUD; TanStack Query ile liste otomatik güncellenir, F5'te veriler eksiksiz gelir.
 
-### Hareketler Tablosu
-Sütunlar: Tarih, Açıklama, Ref No, Borç, Alacak, Bakiye, Döviz, Kaynak (PDF/Excel/CSV/Manuel), Durum.
+## 3) `/bankalar/ekstreler` — Banka Ekstreleri
 
-- Sayfalama 25/50/100 + sütun sıralama.
-- Satır aksiyonu: durum değiştir, düzenle, sil.
-- **Excel'e Dışa Aktar** butonu.
+- Üstte **Banka dropdown** + tek **Ekstre Ekle** butonu (`<input type="file" accept=".pdf,.xlsx,.xls,.csv">`). Sürükle-bırak yok.
+- Otomatik ayrıştırma: PDF → `parseBankPdf` (Halkbank/VakıfBank/Genel); Excel/CSV → `parseBankExcelStatement`.
+- Önizleme dialog: parser adı, satır sayısı, mükerrer sayısı → **Aktar** → `bank_imports` + `bank_transactions` bulk insert.
+- **Hareketler tablosu**: Tarih, Açıklama, Ref No, Borç, Alacak, Bakiye, Para Birimi.
+  - Arama (açıklama + ref no), tarih & tutar sıralama, banka/borç/alacak filtreleri, sayfalama (25/50/100).
+- Üstte özet kartları: Toplam Borç, Toplam Alacak, Toplam İşlem, Son Bakiye.
+- **Dosya Geçmişi**: Dosya Adı, Banka, Tür, Yüklenme Tarihi, İşlem Sayısı. Her satır: **Görüntüle** (o import_id'e filtre), **Yeniden İşle** (cascade delete + yeniden yükleme istemi), **Sil** (onay + cascade delete).
+- Mobil ve masaüstünde responsive; tablo yatay kaydırılır, kartlar tek/çift sütun.
 
-### Filtreler + Arama
-Tarih aralığı, Banka (multi), Döviz, Sadece Borç / Sadece Alacak, Durum, canlı arama (açıklama+refNo).
+## 4) Veri katmanı
 
-### Dosya Geçmişi
-Collapsible panel. Sütunlar: Dosya Adı, Banka, Tarih, İşlem Sayısı, Durum. Aksiyonlar: **Aç** (o dosyanın hareketlerine filtre), **Yeniden İşle** (cascade delete + yeniden yükleme istemi), **Sil** (cascade — `importId` eşleşen hareketleri kaldırır).
+- Yeni `src/lib/bank-db.ts` — Supabase CRUD helper'ları (banks / transactions / imports / uploadLogo).
+- TanStack Query anahtarları: `['banks']`, `['bank-tx', filters]`, `['bank-imports']` — mutation sonrası invalidate.
+- Zustand'daki `banks / bankTx / bankImports` slice'ları ve aksiyonları temizlenir.
+- Eski `src/routes/bankalar.$id.tsx` silinir; hesap kartından "Hareketler" linki `/bankalar/ekstreler?bank=<id>`.
 
-## Teknik Notlar
-**Değişen/yeni dosyalar:**
-- `src/lib/mock-data.ts` — `BankTx` ve `Bank`'e opsiyonel alanlar.
-- `src/lib/bank-parsers.ts` — çıktı zenginleştirilir.
-- `src/lib/importers.ts` — `parseBankExcel()`.
-- `src/routes/bankalar.tsx` — `/bankalar/hesaplar`'a redirect.
-- `src/routes/bankalar.hesaplar.tsx` — hesap yönetimi (mevcut UI uyarlanır).
-- `src/routes/bankalar.ekstreler.tsx` — yeni ekstre/hareket sayfası.
-- `src/components/app-sidebar.tsx` — Bankalar alt-menüsü.
-- `src/routes/bankalar.$id.tsx` — korunur; Hesaplar'dan linklenir.
+## 5) Etkilenmeyen modüller
 
-**Store:** Mevcut `banks/bankTx/bankImports` + eylemler yeterli — migration yok.
+Faturalar, Ürünler, Kasa, Cari, Gelirler/Giderler, Dashboard, Pazaryerleri, Raporlar, Takvim, Fiyat Teklifi — hiçbiri değişmez.
+
+## Uygulama sırası
+
+1. Supabase migration (3 tablo + RLS + trigger).
+2. Storage bucket `bank-logos` + RLS.
+3. `src/lib/bank-db.ts`.
+4. `bankalar.hesaplar.tsx` yeniden yazılır.
+5. `bankalar.ekstreler.tsx` yeniden yazılır.
+6. Zustand & eski `bankalar.$id.tsx` temizlenir.
