@@ -20,7 +20,8 @@ import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { fmt, type BankTx } from "@/lib/mock-data";
 import { useStore, bankBalance } from "@/lib/store";
-import { parseExcel, parsePdfLines, rowsToBankTx, linesToBankTx } from "@/lib/importers";
+import { parseExcel, parsePdfLines, rowsToBankTx } from "@/lib/importers";
+import { parseBankPdf } from "@/lib/bank-parsers";
 import { useSelection } from "@/hooks/use-selection";
 
 export const Route = createFileRoute("/bankalar/$id")({
@@ -168,26 +169,18 @@ function Page() {
             <Button variant="outline" size="sm" onClick={() => setShowHistory((v) => !v)}>
               <History className="mr-1 h-4 w-4" /> Dosya Geçmişi {imports.length > 0 && `(${imports.length})`}
             </Button>
-            <BankImportButton bankId={id} kind="excel"
-              onDone={(txs, meta) => {
-                const existing = new Set(tx.map(dedupKey));
-                const fresh = txs.filter((x) => !existing.has(dedupKey(x)));
-                const importId = addImport({ ...meta, success: fresh.length, failed: txs.length - fresh.length });
-                bulkAddBankTx(fresh.map((x) => ({ ...x, importId })));
-                toast.success(`${fresh.length} hareket eklendi`, {
-                  description: `${txs.length - fresh.length} mükerrer atlandı · ${meta.fileName}`,
-                });
-              }} />
-            <BankImportButton bankId={id} kind="pdf"
-              onDone={(txs, meta) => {
-                const existing = new Set(tx.map(dedupKey));
-                const fresh = txs.filter((x) => !existing.has(dedupKey(x)));
-                const importId = addImport({ ...meta, success: fresh.length, failed: txs.length - fresh.length });
-                bulkAddBankTx(fresh.map((x) => ({ ...x, importId })));
-                toast.success(`${fresh.length} hareket PDF'ten alındı`, {
-                  description: `${txs.length - fresh.length} mükerrer atlandı · ${meta.fileName}`,
-                });
-              }} />
+            {(["excel", "csv", "pdf"] as const).map((k) => (
+              <BankImportButton key={k} bankId={id} kind={k}
+                onDone={(txs, meta, parserName) => {
+                  const existing = new Set(tx.map(dedupKey));
+                  const fresh = txs.filter((x) => !existing.has(dedupKey(x)));
+                  const importId = addImport({ ...meta, success: fresh.length, failed: txs.length - fresh.length });
+                  bulkAddBankTx(fresh.map((x) => ({ ...x, importId })));
+                  toast.success(`${fresh.length} hareket eklendi`, {
+                    description: `${txs.length - fresh.length} mükerrer atlandı · ${meta.fileName}${parserName ? ` · ${parserName}` : ""}`,
+                  });
+                }} />
+            ))}
             <Dialog open={openNew} onOpenChange={(v) => { setOpenNew(v); if (v) setForm(emptyForm()); }}>
               <DialogTrigger asChild>
                 <Button size="sm" className="gradient-primary text-primary-foreground shadow-elegant">
