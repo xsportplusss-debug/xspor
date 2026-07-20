@@ -660,7 +660,7 @@ function BankImportButton({
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="text-xs text-muted-foreground">{file.name} · {pdfPreview.length} okunabilir hareket</div>
+            <div className="text-xs text-muted-foreground">{file.name} · {pdfPreview.length} okunabilir hareket {pdfParser && <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-primary">{pdfParser} formatı</span>}</div>
             <div className="max-h-72 overflow-auto rounded-md border">
               <Table>
                 <TableHeader><TableRow><TableHead>Tarih</TableHead><TableHead>Açıklama</TableHead><TableHead className="text-right">Tutar</TableHead></TableRow></TableHeader>
@@ -689,7 +689,7 @@ function BankImportButton({
             <>
               <Button variant="ghost" onClick={reset}>Dosyayı Değiştir</Button>
               <Button className="gradient-primary text-primary-foreground"
-                onClick={kind === "excel" ? applyExcel : applyPdf} disabled={loading}>
+                onClick={kind === "pdf" ? applyPdf : applyExcel} disabled={loading}>
                 Aktar
               </Button>
             </>
