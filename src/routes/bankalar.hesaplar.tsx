@@ -29,13 +29,15 @@ export const Route = createFileRoute("/bankalar/hesaplar")({
 
 const COLORS = ["#00A651", "#0055A4", "#004990", "#E30613", "#7B2CBF", "#F27A1A"];
 const CURRENCIES = ["TRY", "USD", "EUR", "GBP", "CHF"];
+const ACCOUNT_TYPES = ["Vadesiz", "Vadeli", "Kredi", "POS", "Döviz"];
 
 
 type FormState = Omit<Bank, "id">;
 
 const emptyForm: FormState = {
   name: "", short: "", iban: "", currency: "TRY", balance: 0, color: COLORS[0], active: true,
-  accountName: "", branchName: "", branchCode: "", accountNumber: "",
+  accountName: "", accountType: "Vadesiz",
+  branchName: "", branchCode: "", accountNumber: "",
   openingDate: new Date().toISOString().slice(0, 10), description: "",
 };
 
