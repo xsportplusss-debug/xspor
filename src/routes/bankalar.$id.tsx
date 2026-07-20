@@ -20,8 +20,7 @@ import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { fmt, type BankTx } from "@/lib/mock-data";
 import { useStore, bankBalance } from "@/lib/store";
-import { parseExcel, parsePdfTextLines, rowsToBankTx } from "@/lib/importers";
-import { parseBankPdf } from "@/lib/bank-parsers";
+import { parseExcel, parsePdfLines, rowsToBankTx, linesToBankTx } from "@/lib/importers";
 import { useSelection } from "@/hooks/use-selection";
 
 export const Route = createFileRoute("/bankalar/$id")({
@@ -169,18 +168,26 @@ function Page() {
             <Button variant="outline" size="sm" onClick={() => setShowHistory((v) => !v)}>
               <History className="mr-1 h-4 w-4" /> Dosya Geçmişi {imports.length > 0 && `(${imports.length})`}
             </Button>
-            {(["excel", "csv", "pdf"] as const).map((k) => (
-              <BankImportButton key={k} bankId={id} kind={k}
-                onDone={(txs, meta, parserName) => {
-                  const existing = new Set(tx.map(dedupKey));
-                  const fresh = txs.filter((x) => !existing.has(dedupKey(x)));
-                  const importId = addImport({ ...meta, success: fresh.length, failed: txs.length - fresh.length });
-                  bulkAddBankTx(fresh.map((x) => ({ ...x, importId })));
-                  toast.success(`${fresh.length} hareket eklendi`, {
-                    description: `${txs.length - fresh.length} mükerrer atlandı · ${meta.fileName}${parserName ? ` · ${parserName}` : ""}`,
-                  });
-                }} />
-            ))}
+            <BankImportButton bankId={id} kind="excel"
+              onDone={(txs, meta) => {
+                const existing = new Set(tx.map(dedupKey));
+                const fresh = txs.filter((x) => !existing.has(dedupKey(x)));
+                const importId = addImport({ ...meta, success: fresh.length, failed: txs.length - fresh.length });
+                bulkAddBankTx(fresh.map((x) => ({ ...x, importId })));
+                toast.success(`${fresh.length} hareket eklendi`, {
+                  description: `${txs.length - fresh.length} mükerrer atlandı · ${meta.fileName}`,
+                });
+              }} />
+            <BankImportButton bankId={id} kind="pdf"
+              onDone={(txs, meta) => {
+                const existing = new Set(tx.map(dedupKey));
+                const fresh = txs.filter((x) => !existing.has(dedupKey(x)));
+                const importId = addImport({ ...meta, success: fresh.length, failed: txs.length - fresh.length });
+                bulkAddBankTx(fresh.map((x) => ({ ...x, importId })));
+                toast.success(`${fresh.length} hareket PDF'ten alındı`, {
+                  description: `${txs.length - fresh.length} mükerrer atlandı · ${meta.fileName}`,
+                });
+              }} />
             <Dialog open={openNew} onOpenChange={(v) => { setOpenNew(v); if (v) setForm(emptyForm()); }}>
               <DialogTrigger asChild>
                 <Button size="sm" className="gradient-primary text-primary-foreground shadow-elegant">
@@ -518,12 +525,8 @@ function BankImportButton({
   bankId, kind, onDone,
 }: {
   bankId: string;
-  kind: "excel" | "csv" | "pdf";
-  onDone: (
-    txs: Omit<BankTx, "id">[],
-    meta: Omit<ImportMeta, "success" | "failed"> & { fileName: string },
-    parserName?: string,
-  ) => void;
+  kind: "excel" | "pdf";
+  onDone: (txs: Omit<BankTx, "id">[], meta: Omit<ImportMeta, "success" | "failed"> & { fileName: string }) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -533,15 +536,14 @@ function BankImportButton({
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<FieldId, string>>({} as any);
   const [pdfPreview, setPdfPreview] = useState<Omit<BankTx, "id">[]>([]);
-  const [pdfParser, setPdfParser] = useState<string>("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const reset = () => { setFile(null); setRows([]); setHeaders([]); setMapping({} as any); setPdfPreview([]); setPdfParser(""); };
+  const reset = () => { setFile(null); setRows([]); setHeaders([]); setMapping({} as any); setPdfPreview([]); };
 
   const handleFile = async (f: File) => {
     setLoading(true);
     try {
-      if (kind === "excel" || kind === "csv") {
+      if (kind === "excel") {
         const r = await parseExcel(f);
         const hs = r.length ? Object.keys(r[0]) : [];
         const m = {} as Record<FieldId, string>;
@@ -550,14 +552,10 @@ function BankImportButton({
           if (g && !m[g]) m[g] = h;
         }
         setRows(r); setHeaders(hs); setMapping(m); setFile(f);
-        setOpen(true);
       } else {
-        const lines = await parsePdfTextLines(f);
-        const { txs, parser } = parseBankPdf(lines, bankId);
-        setPdfPreview(txs);
-        setPdfParser(parser);
+        const lines = await parsePdfLines(f);
+        setPdfPreview(linesToBankTx(lines, bankId));
         setFile(f);
-        setOpen(true);
       }
     } catch (e: any) {
       toast.error("Dosya okunamadı", { description: e.message });
@@ -583,7 +581,7 @@ function BankImportButton({
       ...t,
       refNo: mapped[i].ref ? String(mapped[i].ref) : undefined,
     }));
-    const ext: "csv" | "xls" | "xlsx" = kind === "csv" || file.name.toLowerCase().endsWith(".csv") ? "csv"
+    const ext = file.name.toLowerCase().endsWith(".csv") ? "csv"
       : file.name.toLowerCase().endsWith(".xls") ? "xls" : "xlsx";
     onDone(txs, { bankId, fileName: file.name, fileType: ext, importedAt: new Date().toISOString(), total: txs.length });
     setOpen(false); reset();
@@ -591,48 +589,50 @@ function BankImportButton({
 
   const applyPdf = () => {
     if (!file) return;
-    onDone(pdfPreview, { bankId, fileName: file.name, fileType: "pdf", importedAt: new Date().toISOString(), total: pdfPreview.length }, pdfParser);
+    onDone(pdfPreview, { bankId, fileName: file.name, fileType: "pdf", importedAt: new Date().toISOString(), total: pdfPreview.length });
     setOpen(false); reset();
   };
 
-  const accept = kind === "excel" ? ".xlsx,.xls" : kind === "csv" ? ".csv" : "application/pdf";
-  const label = kind === "excel" ? "Excel Yükle" : kind === "csv" ? "CSV Yükle" : "PDF Yükle";
-  const icon = kind === "pdf" ? <FileText className="mr-1 h-4 w-4" /> : <FileSpreadsheet className="mr-1 h-4 w-4" />;
+  const accept = kind === "excel" ? ".xlsx,.xls,.csv" : "application/pdf";
 
   return (
-    <>
-      <input
-        ref={inputRef}
-        type="file"
-        accept={accept}
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) handleFile(f);
-          e.target.value = "";
-        }}
-      />
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={loading}
-        onClick={() => inputRef.current?.click()}
-      >
-        {icon} {label}
-      </Button>
-      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>
-              {kind === "pdf" ? "Banka Ekstresi Önizleme (PDF)" : kind === "csv" ? "CSV Ekstre Önizleme" : "Excel Ekstre Önizleme"}
-            </DialogTitle>
-          </DialogHeader>
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          {kind === "excel"
+            ? <><FileSpreadsheet className="mr-1 h-4 w-4" /> Excel / CSV</>
+            : <><FileText className="mr-1 h-4 w-4" /> PDF Ekstre</>}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>{kind === "excel" ? "Banka Hareketlerini İçe Aktar (Excel/CSV)" : "Banka Ekstresi Yükle (PDF)"}</DialogTitle>
+        </DialogHeader>
 
-          {file && kind !== "pdf" ? (
-            <div className="space-y-3">
-              <div className="text-xs text-muted-foreground">{file.name} · {rows.length} satır</div>
-              <div className="grid gap-2 sm:grid-cols-2">
-
+        {!file ? (
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+            onDragLeave={() => setDrag(false)}
+            onDrop={(e) => {
+              e.preventDefault(); setDrag(false);
+              const f = e.dataTransfer.files?.[0]; if (f) handleFile(f);
+            }}
+            onClick={() => inputRef.current?.click()}
+            className={`grid cursor-pointer place-items-center rounded-xl border-2 border-dashed p-10 text-center transition
+              ${drag ? "border-primary bg-primary/5" : "border-border hover:bg-muted/30"}`}
+          >
+            <Upload className="mb-2 h-8 w-8 text-muted-foreground" />
+            <div className="text-sm font-medium">Dosyayı buraya sürükleyin veya tıklayın</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {kind === "excel" ? "Excel (.xlsx, .xls) veya CSV" : "Metin tabanlı PDF banka ekstresi"}
+            </div>
+            <input ref={inputRef} type="file" accept={accept} className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
+          </div>
+        ) : kind === "excel" ? (
+          <div className="space-y-3">
+            <div className="text-xs text-muted-foreground">{file.name} · {rows.length} satır</div>
+            <div className="grid gap-2 sm:grid-cols-2">
               {MAP_FIELDS.map((f) => (
                 <div key={f.id}>
                   <Label className="text-xs">{f.label}</Label>
@@ -660,44 +660,44 @@ function BankImportButton({
               </div>
             </div>
           </div>
-          ) : file && kind === "pdf" ? (
-            <div className="space-y-3">
-              <div className="text-xs text-muted-foreground">{file.name} · {pdfPreview.length} okunabilir hareket {pdfParser && <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-primary">{pdfParser} formatı</span>}</div>
-              <div className="max-h-72 overflow-auto rounded-md border">
-                <Table>
-                  <TableHeader><TableRow><TableHead>Tarih</TableHead><TableHead>Açıklama</TableHead><TableHead>Ref</TableHead><TableHead className="text-right">Tutar</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {pdfPreview.slice(0, 30).map((t, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="text-xs whitespace-nowrap">{t.date}</TableCell>
-                        <TableCell className="text-xs max-w-[420px] truncate">{t.description}</TableCell>
-                        <TableCell className="text-xs font-mono text-muted-foreground">{t.refNo || "—"}</TableCell>
-                        <TableCell className={`text-right text-xs ${t.amount >= 0 ? "text-success" : "text-destructive"}`}>{t.amount.toFixed(2)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              {pdfPreview.length === 0 && (
-                <div className="rounded-md bg-warning/10 p-3 text-xs text-warning">
-                  Otomatik okunabilir satır bulunamadı. PDF taranmış görüntü olabilir.
-                </div>
-              )}
+        ) : (
+          <div className="space-y-3">
+            <div className="text-xs text-muted-foreground">{file.name} · {pdfPreview.length} okunabilir hareket</div>
+            <div className="max-h-72 overflow-auto rounded-md border">
+              <Table>
+                <TableHeader><TableRow><TableHead>Tarih</TableHead><TableHead>Açıklama</TableHead><TableHead className="text-right">Tutar</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {pdfPreview.slice(0, 30).map((t, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="text-xs">{t.date}</TableCell>
+                      <TableCell className="text-xs">{t.description}</TableCell>
+                      <TableCell className={`text-right text-xs ${t.amount >= 0 ? "text-success" : "text-destructive"}`}>{t.amount.toFixed(2)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
-          ) : null}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setOpen(false); reset(); }} disabled={loading}>İptal</Button>
-            {file && (
-              <Button className="gradient-primary text-primary-foreground"
-                onClick={kind === "pdf" ? applyPdf : applyExcel} disabled={loading}>
-                Aktar ({kind === "pdf" ? pdfPreview.length : rows.length})
-              </Button>
+            {pdfPreview.length === 0 && (
+              <div className="rounded-md bg-warning/10 p-3 text-xs text-warning">
+                Otomatik okunabilir satır bulunamadı. Manuel giriş yapabilir veya Excel'e çevirip tekrar deneyebilirsiniz.
+              </div>
             )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => { setOpen(false); reset(); }} disabled={loading}>İptal</Button>
+          {file && (
+            <>
+              <Button variant="ghost" onClick={reset}>Dosyayı Değiştir</Button>
+              <Button className="gradient-primary text-primary-foreground"
+                onClick={kind === "excel" ? applyExcel : applyPdf} disabled={loading}>
+                Aktar
+              </Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
-

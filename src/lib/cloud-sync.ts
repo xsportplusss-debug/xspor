@@ -38,23 +38,14 @@ function isEmpty(data: Record<string, unknown>) {
   });
 }
 
-const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024; // 4 MB — Supabase Data API row limit safety.
-
 async function push() {
   if (!currentUserId || !hydrated || saving) return;
   saving = true;
   try {
-    const dataSnap = snapshotData();
-    const companySnap = snapshotCompany();
-    const approxSize = JSON.stringify(dataSnap).length + JSON.stringify(companySnap).length;
-    if (approxSize > MAX_PAYLOAD_BYTES) {
-      console.warn("cloud sync skipped — payload too large", approxSize);
-      return;
-    }
     const payload = {
       user_id: currentUserId,
-      data: dataSnap as never,
-      company: companySnap as never,
+      data: snapshotData() as never,
+      company: snapshotCompany() as never,
       updated_at: new Date().toISOString(),
     };
     await supabase.from("user_data").upsert(payload, { onConflict: "user_id" });
@@ -68,9 +59,8 @@ async function push() {
 function schedulePush() {
   if (!hydrated) return;
   if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(push, 2500);
+  saveTimer = setTimeout(push, 800);
 }
-
 
 export async function loadFromCloud(userId: string) {
   currentUserId = userId;

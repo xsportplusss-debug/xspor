@@ -175,7 +175,7 @@ function Page() {
               {company.logoUrl && (
                 <img src={company.logoUrl} alt={company.name} className="h-20 w-auto object-contain" />
               )}
-              <img src={qrSrc} alt="XSportPlus web sitesi QR Kodu" className="h-24 w-24 rounded border bg-white p-1" />
+              <img src={qrSrc} alt="QR" className="h-24 w-24 rounded border bg-white p-1" />
               <div className="w-full max-w-[220px] rounded-lg border bg-muted/30 p-3 text-xs">
                 <div className="mb-1 text-center text-[10px] font-semibold uppercase tracking-widest text-primary">Fiyat Teklifi</div>
                 <div className="grid gap-1">

@@ -1,58 +1,54 @@
 
-# Bankalar Modülü — Supabase Kalıcı Veritabanı ile Yeniden Tasarım
+# Fintra Genişletme Planı
 
-Bankalar iki alt menüye ayrılır ve tüm veriler Supabase'de (Lovable Cloud) saklanır — hangi cihazdan girersen gir aynı verileri görürsün. Diğer modüller (Faturalar, Ürünler, Kasa, Cari vb.) değişmez.
+Mevcut sistem korunacak. Hiçbir tablo, route veya store alanı silinmeyecek. Tüm yenilikler **modüler** ve **ek** olarak gelecek. Gerçek API bağlantıları şimdilik yok — servis katmanı hazır, mock ile çalışır, ileride kolayca gerçek API'ye bağlanır.
 
-## 1) Veritabanı — 3 yeni tablo + Storage bucket
+## 1. Servis Katmanı (yeni)
+- `src/services/e-invoice/` — E-Fatura servisi (mock adapter + interface)
+- `src/services/marketplaces/` — her pazaryeri için ayrı adapter (Trendyol, Hepsiburada, N11, Amazon, Pazarama, ÇiçekSepeti, PTTAVM, idefix, Turkcell Pasaj) — ortak `MarketplaceAdapter` arayüzü
+- Gelecekte gerçek `fetch` çağrıları bu dosyalara eklenecek.
 
-**`banks`** — banka hesap tanımları
-name, logo_url, iban, account_name, currency, description, user_id.
+## 2. Store Genişletmeleri (kırılmadan)
+`src/lib/store.ts` içine yeni alanlar eklenir, eskiler dokunulmaz:
+- `eInvoiceConfig`, `eInvoiceLastSync`
+- `marketplaceConfigs: Record<string, {...}>`
+- `marketplaceOrders: MarketplaceOrder[]`
+- `cashTx.category` (opsiyonel yeni alan)
+- `banks.active` (opsiyonel — pasif/aktif)
+- Invoice tipine opsiyonel `source: "manual" | "e-invoice"` + `uuid` (duplicate kontrolü)
 
-**`bank_imports`** — yüklenen ekstre dosyaları
-bank_id (FK→banks cascade), file_name, file_type, parser, tx_count, uploaded_at, user_id.
+## 3. Yeni Rotalar
+- `/e-fatura-entegrasyon` — Config formu, "Bağlantıyı Test Et", "Faturaları Çek", son senkron tarihi
+- `/pazaryerleri/ayarlar` — Her pazaryeri için API config kartı, "Bağlı" rozeti, "Siparişleri Çek"
+- Mevcut pazaryeri sayfalarına yeni pazaryerleri eklenir (ÇiçekSepeti, PTTAVM, idefix, Turkcell Pasaj) — mevcutlar aynı kalır
 
-**`bank_transactions`** — banka hareketleri
-bank_id (FK→banks cascade), import_id (FK→bank_imports cascade, nullable=manuel), date, description, ref_no, debit, credit, balance, currency, source (PDF/Excel/CSV/Manuel), user_id.
-Mükerrer koruması: UNIQUE(user_id, bank_id, date, description, debit, credit, ref_no).
+## 4. Modül İyileştirmeleri
+- **Bankalar**: Pasif yap, Düzenle, kartta Toplam Gelen/Giden/Son Hareket/Adet. CSV import eklenir (Excel/PDF zaten var).
+- **Ürünler**: Kur alanı UI'dan kaldırılır (mevcut veriler bozulmaz, alan opsiyonel kalır). Yeni Ürün formu sadeleşir.
+- **Fiyat Teklifi**: Para birimi seçimi USD/EUR/GBP/TL genişletilir, kur teklif özelinde çalışır (zaten benzer, GBP eklenir).
+- **Kasa**: Nakit Giriş/Çıkış dialoglarına kategori seçici (Yemek, Yakıt, Kargo, Market, Personel, Ofis, Reklam, Diğer).
+- **Gelirler / Giderler**: Mevcut sayfalar zenginleştirilir — kaynak filtresi (Banka/Kasa/Pazaryeri/Diğer), kategori renk kodları, toplam kart.
+- **Dashboard**: Yeni kartlar (Bugünkü Ciro/Tahsilat/Gider, Bekleyen Tahsilat/Borç, Pazaryeri Siparişleri, Net Kâr, E-Fatura yeşil rozet).
 
-**Storage bucket `bank-logos`** — public read; upload/delete `auth.uid()` sahibine kısıtlı.
+## 5. Entegrasyon
+- Pazaryeri siparişleri çekildiğinde otomatik `bankTx` benzeri hareket + `marketplaceOrders` kaydı → Gelir/Gider/Dashboard otomatik yansır.
+- E-Fatura çekimi → mevcut `salesInvoices`/`purchaseInvoices` içine UUID/no bazlı duplicate check ile eklenir, `source: "e-invoice"` etiketi.
+- Kasa/Banka hareketleri zaten Gelir/Gider'e yansıyor; kategori bilgisi de aktarılır.
 
-Tüm tablolarda RLS + `auth.uid() = user_id` politikaları + `updated_at` trigger.
+## 6. Dokunulmayacaklar
+- Supabase şeması (user_data JSON blob — genişleme otomatik)
+- Auth akışı, Drive yedek, mevcut Excel/PDF importerlar
+- Mevcut route yolları ve isimleri
+- localStorage anahtarı `fintra:v1`
 
-## 2) `/bankalar/hesaplar` — Banka Ekle
+## Uygulama Sırası
+1. Store + tip genişletmeleri
+2. Servis katmanı iskeleti (mock)
+3. E-Fatura rotası
+4. Pazaryeri config rotası + yeni pazaryeri sayfaları
+5. Kasa kategori, Ürünler UI sadeleştirme, GBP
+6. Bankalar kart metrikleri + pasif
+7. Gelir/Gider zenginleştirme
+8. Dashboard yeni kartlar
 
-- Form: **Banka Adı**, **Logo** (PNG/JPG/SVG bilgisayardan yüklenir → Storage), **IBAN**, **Hesap Adı**, **Para Birimi** (TRY/USD/EUR/GBP/CHF), **Açıklama**.
-- Butonlar: **Yeni Banka**, **Kaydet**, **Düzenle**, **Sil** ("Bu bankayı silmek istediğinize emin misiniz?" AlertDialog → onaylanınca cascade delete).
-- Kart görünümü: logo + banka adı + IBAN + para birimi.
-- Anlık Supabase CRUD; TanStack Query ile liste otomatik güncellenir, F5'te veriler eksiksiz gelir.
-
-## 3) `/bankalar/ekstreler` — Banka Ekstreleri
-
-- Üstte **Banka dropdown** + tek **Ekstre Ekle** butonu (`<input type="file" accept=".pdf,.xlsx,.xls,.csv">`). Sürükle-bırak yok.
-- Otomatik ayrıştırma: PDF → `parseBankPdf` (Halkbank/VakıfBank/Genel); Excel/CSV → `parseBankExcelStatement`.
-- Önizleme dialog: parser adı, satır sayısı, mükerrer sayısı → **Aktar** → `bank_imports` + `bank_transactions` bulk insert.
-- **Hareketler tablosu**: Tarih, Açıklama, Ref No, Borç, Alacak, Bakiye, Para Birimi.
-  - Arama (açıklama + ref no), tarih & tutar sıralama, banka/borç/alacak filtreleri, sayfalama (25/50/100).
-- Üstte özet kartları: Toplam Borç, Toplam Alacak, Toplam İşlem, Son Bakiye.
-- **Dosya Geçmişi**: Dosya Adı, Banka, Tür, Yüklenme Tarihi, İşlem Sayısı. Her satır: **Görüntüle** (o import_id'e filtre), **Yeniden İşle** (cascade delete + yeniden yükleme istemi), **Sil** (onay + cascade delete).
-- Mobil ve masaüstünde responsive; tablo yatay kaydırılır, kartlar tek/çift sütun.
-
-## 4) Veri katmanı
-
-- Yeni `src/lib/bank-db.ts` — Supabase CRUD helper'ları (banks / transactions / imports / uploadLogo).
-- TanStack Query anahtarları: `['banks']`, `['bank-tx', filters]`, `['bank-imports']` — mutation sonrası invalidate.
-- Zustand'daki `banks / bankTx / bankImports` slice'ları ve aksiyonları temizlenir.
-- Eski `src/routes/bankalar.$id.tsx` silinir; hesap kartından "Hareketler" linki `/bankalar/ekstreler?bank=<id>`.
-
-## 5) Etkilenmeyen modüller
-
-Faturalar, Ürünler, Kasa, Cari, Gelirler/Giderler, Dashboard, Pazaryerleri, Raporlar, Takvim, Fiyat Teklifi — hiçbiri değişmez.
-
-## Uygulama sırası
-
-1. Supabase migration (3 tablo + RLS + trigger).
-2. Storage bucket `bank-logos` + RLS.
-3. `src/lib/bank-db.ts`.
-4. `bankalar.hesaplar.tsx` yeniden yazılır.
-5. `bankalar.ekstreler.tsx` yeniden yazılır.
-6. Zustand & eski `bankalar.$id.tsx` temizlenir.
+Onaylarsan sırayla uygulamaya başlıyorum.

@@ -28,7 +28,7 @@ function Page() {
           <CardHeader><CardTitle className="text-base">Firma Bilgileri</CardTitle></CardHeader>
           <CardContent className="grid gap-4">
             <div className="flex items-center gap-4">
-              {c.logoUrl && <img src={c.logoUrl} alt="Firma Logosu" className="h-16 w-16 rounded-lg object-contain border bg-white p-1" />}
+              {c.logoUrl && <img src={c.logoUrl} alt="logo" className="h-16 w-16 rounded-lg object-contain border bg-white p-1" />}
               <div className="flex-1 grid gap-2"><Label>Logo URL</Label><Input value={c.logoUrl} onChange={(e) => c.set({ logoUrl: e.target.value })} /></div>
             </div>
             <div className="grid gap-2"><Label>Ünvan</Label><Input value={c.name} onChange={(e) => c.set({ name: e.target.value })} /></div>

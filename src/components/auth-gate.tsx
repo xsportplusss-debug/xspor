@@ -7,60 +7,30 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
-function isInAppBrowser(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent || "";
-  return /(FBAN|FBAV|Instagram|Line|Twitter|WhatsApp|Messenger|MicroMessenger|TikTok|Snapchat|LinkedInApp|OKApp|MiuiBrowser|; wv\))/i.test(ua);
-}
-
-type Status = "loading" | "auth" | "unauthorized" | "ready";
+type Status = "loading" | "auth" | "hydrating" | "unauthorized" | "ready";
 
 const ALLOWED_EMAIL = "xsportplusss@gmail.com";
 
 let syncInitialized = false;
-let cloudHydrated = false;
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
-  const [currentEmail, setCurrentEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    // Emergency reset: append ?reset=1 to the URL to wipe cached data and reload.
-    try {
-      if (typeof window !== "undefined" && new URL(window.location.href).searchParams.get("reset") === "1") {
-        localStorage.clear();
-        sessionStorage.clear();
-        const u = new URL(window.location.href);
-        u.searchParams.delete("reset");
-        window.location.replace(u.toString());
-        return;
-      }
-    } catch { /* noop */ }
-
-
     let cancelled = false;
 
-    const handleSession = (userId: string, email: string | undefined) => {
-      setCurrentEmail(email ?? null);
+    const handleSession = async (userId: string, email: string | undefined) => {
       if ((email ?? "").toLowerCase() !== ALLOWED_EMAIL) {
         if (!cancelled) setStatus("unauthorized");
         return;
       }
-      // Show the app immediately from the local (persisted) cache.
-      if (!cancelled) setStatus("ready");
-
-      // Hydrate from cloud + start sync in the background so first paint is instant.
-      if (!cloudHydrated) {
-        cloudHydrated = true;
-        loadFromCloud(userId)
-          .catch((e) => console.error("cloud hydrate failed", e))
-          .finally(() => {
-            if (!syncInitialized) {
-              initAutoSync();
-              syncInitialized = true;
-            }
-          });
+      setStatus("hydrating");
+      await loadFromCloud(userId);
+      if (!syncInitialized) {
+        initAutoSync();
+        syncInitialized = true;
       }
+      if (!cancelled) setStatus("ready");
     };
 
     supabase.auth.getSession().then(({ data }) => {
@@ -73,8 +43,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
       if (event === "SIGNED_IN" && session) handleSession(session.user.id, session.user.email);
       if (event === "SIGNED_OUT") {
         stopSync();
-        cloudHydrated = false;
-        setCurrentEmail(null);
         setStatus("auth");
       }
     });
@@ -85,24 +53,23 @@ export function AuthGate({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  if (status === "loading") {
+  if (status === "loading" || status === "hydrating") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex items-center gap-3 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin" />
-          <span>Yükleniyor...</span>
+          <span>{status === "hydrating" ? "Verileriniz yükleniyor..." : "Yükleniyor..."}</span>
         </div>
       </div>
     );
   }
 
-  if (status === "unauthorized") return <UnauthorizedScreen email={currentEmail} />;
+  if (status === "unauthorized") return <UnauthorizedScreen />;
   if (status === "auth") return <AuthScreen />;
   return <>{children}</>;
 }
 
-
-function UnauthorizedScreen({ email }: { email: string | null }) {
+function UnauthorizedScreen() {
   const [busy, setBusy] = useState(false);
   const signOut = async () => {
     setBusy(true);
@@ -117,22 +84,16 @@ function UnauthorizedScreen({ email }: { email: string | null }) {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-center text-sm text-muted-foreground">
-            Bu uygulamaya yalnızca <b>{ALLOWED_EMAIL}</b> hesabı erişebilir.
+            Bu uygulamaya yalnızca yetkili hesap erişebilir. Lütfen doğru Google hesabıyla giriş yapın.
           </p>
-          {email && (
-            <p className="text-center text-xs text-muted-foreground">
-              Şu an giriş yapılan hesap: <b>{email}</b>
-            </p>
-          )}
           <Button onClick={signOut} disabled={busy} className="w-full">
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Çıkış Yap & Farklı Hesapla Gir"}
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Çıkış Yap"}
           </Button>
         </CardContent>
       </Card>
     </div>
   );
 }
-
 
 
 function AuthScreen() {
@@ -159,11 +120,6 @@ function AuthScreen() {
           </p>
         </CardHeader>
         <CardContent className="space-y-4 pt-2">
-          {isInAppBrowser() && (
-            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
-              Bu bağlantıyı uygulama içi tarayıcıda açtınız (Instagram, WhatsApp, Messenger vb.). Google güvenlik politikası bu tür tarayıcılarda girişi engelliyor. Lütfen sağ üstteki menüden <b>"Tarayıcıda Aç"</b> seçeneği ile Safari veya Chrome'da açın.
-            </div>
-          )}
           <Button onClick={signIn} disabled={busy} className="w-full" variant="outline">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : (
               <>
@@ -171,11 +127,7 @@ function AuthScreen() {
               </>
             )}
           </Button>
-          <p className="text-center text-[11px] text-muted-foreground">
-            Yetkili hesap: <b>{ALLOWED_EMAIL}</b>
-          </p>
         </CardContent>
-
       </Card>
     </div>
   );

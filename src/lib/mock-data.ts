@@ -52,7 +52,6 @@ export type Product = {
   vat: number;
   stock: number;
   minStock: number;
-  kur?: number;           // Manuel kur (Fiyatları Güncelle butonuyla kullanılır)
 };
 
 export type Bank = {
@@ -64,16 +63,8 @@ export type Bank = {
   balance: number; // açılış bakiyesi
   color: string;
   active?: boolean; // pasif yapıldıysa false
-  accountName?: string;
-  accountType?: string; // Vadesiz/Vadeli/Kredi/POS
-  branchName?: string;
-  branchCode?: string;
-  accountNumber?: string;
-  openingDate?: string;
-  description?: string;
 };
 
-export type BankTxStatus = "Yeni" | "Muhasebeleştirildi" | "Eşleşti";
 
 export type BankTx = {
   id: string;
@@ -81,17 +72,11 @@ export type BankTx = {
   date: string;
   description: string;
   category?: string;
-  amount: number; // + giriş, - çıkış (geriye dönük uyum: credit - debit)
-  debit?: number;
-  credit?: number;
-  balance?: number;
-  currency?: string;
+  amount: number; // + giriş, - çıkış
   refNo?: string;
   note?: string;
   cariId?: string;
   importId?: string;
-  source?: "PDF" | "Excel" | "CSV" | "Manuel";
-  status?: BankTxStatus;
 };
 
 export type BankImportRecord = {
@@ -104,7 +89,6 @@ export type BankImportRecord = {
   total: number;
   success: number;
   failed: number;
-  parserName?: string;
 };
 
 

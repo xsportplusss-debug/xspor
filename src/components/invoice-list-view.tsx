@@ -213,10 +213,10 @@ export function InvoiceListView({
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" aria-label="Faturayı düzenle" onClick={() => setEditing(s)}>
+                          <Button variant="ghost" size="icon" onClick={() => setEditing(s)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" aria-label="Faturayı sil" onClick={() => { remove(s.id); toast.success("Silindi"); }}>
+                          <Button variant="ghost" size="icon" onClick={() => { remove(s.id); toast.success("Silindi"); }}>
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </div>

@@ -36,12 +36,6 @@ export async function parsePdfLines(file: File): Promise<string[][]> {
   return rows;
 }
 
-/** PDF sayfalarındaki satırları birleştirilmiş metin dizisi olarak döner. */
-export async function parsePdfTextLines(file: File): Promise<string[]> {
-  const rows = await parsePdfLines(file);
-  return rows.map((r) => r.join(" ").replace(/\s+/g, " ").trim()).filter(Boolean);
-}
-
 const NUM = (v: any) => {
   if (v == null || v === "") return 0;
   if (typeof v === "number") return v;
@@ -183,65 +177,16 @@ export function rowsToBankTx(rows: Row[], bankId: string): Omit<BankTx, "id">[] 
     const wit = NUM(pick(r, ["giden", "cikis", "borc", "debit", "out"]));
     const combined = NUM(pick(r, ["tutar", "amount"]));
     const amount = (dep - wit) || combined;
-    const balance = NUM(pick(r, ["bakiye", "balance", "ozet"]));
-    const refNo = STR(pick(r, ["referans", "ref no", "ref", "islem no", "dekont no"]));
-    const currency = STR(pick(r, ["doviz", "para birimi", "currency"])).toUpperCase() || undefined;
     return {
       bankId,
       date: DATE(pick(r, ["tarih", "date"])) || new Date().toISOString().slice(0, 10),
       description:
-        STR(pick(r, ["dekont aciklamasi", "odeme yapilan firma", "aciklama", "desc", "description", "firma"])) ||
+        STR(pick(r, ["odeme yapilan firma", "aciklama", "desc", "description", "firma"])) ||
         "İçe aktarıldı",
       category: STR(pick(r, ["kategori", "category"])) || undefined,
       amount,
-      debit: wit || undefined,
-      credit: dep || undefined,
-      balance: balance || undefined,
-      refNo: refNo || undefined,
-      currency,
-      source: "Excel" as const,
-      status: "Yeni" as const,
     };
   }).filter((x) => x.amount);
-}
-
-/** Esnek başlık tespiti: ilk 20 satırda başlığı bulmayı dener. */
-export async function parseBankExcelStatement(
-  file: File,
-  bankId: string,
-): Promise<{ txs: Omit<BankTx, "id">[]; parser: string }> {
-  const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array", cellDates: true });
-  const sheet = wb.Sheets[wb.SheetNames[0]];
-  const aoa: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: true });
-  const keywords = ["tarih", "date", "aciklama", "description", "borc", "alacak", "tutar", "bakiye"];
-  let headerIdx = -1;
-  for (let i = 0; i < Math.min(aoa.length, 25); i++) {
-    const row = aoa[i].map((c) => norm(String(c || "")));
-    const hit = row.filter((c) => keywords.some((k) => c.includes(k))).length;
-    if (hit >= 2) { headerIdx = i; break; }
-  }
-  if (headerIdx < 0) {
-    // Fallback: header'ı XLSX'e bulur
-    const rows = XLSX.utils.sheet_to_json<Row>(sheet, { defval: "", raw: true });
-    return { txs: rowsToBankTx(rows, bankId), parser: "Excel (otomatik)" };
-  }
-  const headers = aoa[headerIdx].map((c) => String(c || ""));
-  const rows: Row[] = [];
-  for (let i = headerIdx + 1; i < aoa.length; i++) {
-    const arr = aoa[i];
-    if (!arr || arr.every((c) => c === "" || c == null)) continue;
-    const r: Row = {};
-    headers.forEach((h, j) => { r[h] = arr[j]; });
-    rows.push(r);
-  }
-  const ext = (file.name.split(".").pop() || "").toLowerCase();
-  const parser = ext === "csv" ? "CSV (otomatik)" : "Excel (otomatik)";
-  const txs = rowsToBankTx(rows, bankId).map((t) => ({
-    ...t,
-    source: (ext === "csv" ? "CSV" : "Excel") as "CSV" | "Excel",
-  }));
-  return { txs, parser };
 }
 
 export function linesToBankTx(lines: string[][], bankId: string): Omit<BankTx, "id">[] {
@@ -257,7 +202,7 @@ export function linesToBankTx(lines: string[][], bankId: string): Omit<BankTx, "
     const amount = (raw.startsWith("-") ? -1 : 1) * NUM(raw.replace("-", ""));
     if (!amount) continue;
     const desc = joined.replace(dateRe, "").replace(/-?[\d.,]+\s*(TL|₺)?\s*$/i, "").trim().slice(0, 80);
-    out.push({ bankId, date: DATE(dateMatch[0]), description: desc || "—", amount, source: "PDF", status: "Yeni" });
+    out.push({ bankId, date: DATE(dateMatch[0]), description: desc || "—", amount });
   }
   return out;
 }

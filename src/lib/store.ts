@@ -253,34 +253,7 @@ export const useStore = create<State & Actions>()(
       resetAll: () => set(() => ({ ...initial })),
 
     }),
-    {
-      name: "fintra:v1",
-      version: 3,
-      // Only persist lightweight fields. Bulk data (products, bankTx, marketplaceOrders)
-      // is stored in Supabase or re-derivable — persisting them can lock the main
-      // thread on JSON.stringify/localStorage.setItem when the dataset grows.
-      partialize: (s) => ({
-        salesInvoices: s.salesInvoices,
-        purchaseInvoices: s.purchaseInvoices,
-        cariList: s.cariList,
-        categories: s.categories,
-        cashRegisters: s.cashRegisters,
-        cashTx: s.cashTx,
-        eInvoiceConfig: s.eInvoiceConfig,
-        eInvoiceLastSync: s.eInvoiceLastSync,
-        marketplaceConfigs: s.marketplaceConfigs,
-      }),
-      migrate: (state: any, version) => {
-        if (!state) return state;
-        if (version < 2) {
-          return { ...state, banks: [], bankTx: [], bankImports: [] };
-        }
-        if (version < 3) {
-          return { ...state, products: [], bankTx: [], bankImports: [], marketplaceOrders: [] };
-        }
-        return state;
-      },
-    },
+    { name: "fintra:v1" },
   ),
 );
 
