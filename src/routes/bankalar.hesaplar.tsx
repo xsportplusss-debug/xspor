@@ -138,7 +138,7 @@ function Page() {
               <div><Label>Şube Kodu</Label><Input value={form.branchCode} onChange={(e) => setForm({ ...form, branchCode: e.target.value })} /></div>
             </div>
             <div><Label>IBAN</Label><Input value={form.iban} onChange={(e) => setForm({ ...form, iban: e.target.value.toUpperCase() })} /></div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               <div>
                 <Label>Para Birimi</Label>
                 <select
@@ -147,6 +147,16 @@ function Page() {
                   onChange={(e) => setForm({ ...form, currency: e.target.value })}
                 >
                   {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label>Hesap Türü</Label>
+                <select
+                  className="mt-1 h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                  value={form.accountType || "Vadesiz"}
+                  onChange={(e) => setForm({ ...form, accountType: e.target.value })}
+                >
+                  {ACCOUNT_TYPES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div><Label>Başlangıç Bakiyesi</Label><Input type="number" value={form.balance} onChange={(e) => setForm({ ...form, balance: +e.target.value })} /></div>
