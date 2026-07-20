@@ -25,6 +25,19 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [currentEmail, setCurrentEmail] = useState<string | null>(null);
 
   useEffect(() => {
+    // Emergency reset: append ?reset=1 to the URL to wipe cached data and reload.
+    try {
+      if (typeof window !== "undefined" && new URL(window.location.href).searchParams.get("reset") === "1") {
+        localStorage.clear();
+        sessionStorage.clear();
+        const u = new URL(window.location.href);
+        u.searchParams.delete("reset");
+        window.location.replace(u.toString());
+        return;
+      }
+    } catch { /* noop */ }
+
+
     let cancelled = false;
 
     const handleSession = (userId: string, email: string | undefined) => {
