@@ -55,6 +55,48 @@ export type Database = {
           },
         ]
       }
+      bank_statements: {
+        Row: {
+          account_name: string
+          bank_name: string
+          created_at: string
+          file_name: string
+          file_path: string
+          file_size: number
+          id: string
+          mime_type: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_name?: string
+          bank_name?: string
+          created_at?: string
+          file_name: string
+          file_path: string
+          file_size?: number
+          id?: string
+          mime_type?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_name?: string
+          bank_name?: string
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          id?: string
+          mime_type?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       bank_transactions: {
         Row: {
           balance: number | null
