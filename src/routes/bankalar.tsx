@@ -118,6 +118,9 @@ function Page() {
         }
       />
 
+      <BankStatementsSection />
+
+
       {banks.length === 0 ? (
         <EmptyState icon={Landmark} title="Henüz banka hesabı yok" desc="Yeni hesap ekleyin, ardından hareket girin veya ekstre içe aktarın." />
       ) : (
