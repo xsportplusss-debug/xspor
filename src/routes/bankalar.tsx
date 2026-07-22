@@ -230,11 +230,18 @@ function formatSize(n: number) {
   return `${v.toFixed(v >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
-function BankStatementsSection() {
+function BankStatementsSection({
+  uploadBankId, setUploadBankId,
+}: { uploadBankId: string | null; setUploadBankId: (id: string | null) => void }) {
   const qc = useQueryClient();
   const banks = useStore((s) => s.banks);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<BankStatement | null>(null);
+
+  // auto-open when a per-card upload button is clicked
+  if (uploadBankId && !uploadOpen) {
+    setUploadOpen(true);
+  }
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["bank-statements"],
