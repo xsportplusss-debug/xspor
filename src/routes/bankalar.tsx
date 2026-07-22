@@ -97,6 +97,7 @@ function Page() {
                   <div><Label>Kısaltma</Label><Input value={form.short} onChange={(e) => setForm({ ...form, short: e.target.value.toUpperCase() })} /></div>
                 </div>
                 <div><Label>IBAN</Label><Input value={form.iban} onChange={(e) => setForm({ ...form, iban: e.target.value })} /></div>
+                <div><Label>Hesap No</Label><Input value={form.accountNo} onChange={(e) => setForm({ ...form, accountNo: e.target.value })} placeholder="Ör. 12345678-1" /></div>
                 <div className="grid grid-cols-2 gap-2">
                   <div><Label>Para Birimi</Label><Input value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })} /></div>
                   <div><Label>Açılış Bakiyesi</Label><Input type="number" value={form.balance} onChange={(e) => setForm({ ...form, balance: +e.target.value })} /></div>
