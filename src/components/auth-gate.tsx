@@ -112,15 +112,15 @@ function AuthScreen() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-muted p-4">
-      <Card className="w-full max-w-md glass shadow-elegant">
-        <CardHeader>
-          <CardTitle className="text-center text-2xl">Fintra</CardTitle>
+      <Card className="w-full max-w-sm sm:max-w-md glass shadow-elegant">
+        <CardHeader className="space-y-2">
+          <CardTitle className="text-center text-xl sm:text-2xl">Hoş geldiniz</CardTitle>
           <p className="text-center text-sm text-muted-foreground">
-            Google hesabınızla giriş yapın
+            Devam etmek için Google hesabınızla giriş yapın
           </p>
         </CardHeader>
         <CardContent className="space-y-4 pt-2">
-          <Button onClick={signIn} disabled={busy} className="w-full" variant="outline">
+          <Button onClick={signIn} disabled={busy} className="w-full h-11" variant="outline">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : (
               <>
                 <GoogleIcon /> <span className="ml-2">Google ile Giriş Yap</span>
