@@ -18,9 +18,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Landmark, Plus, Power, Trash2, Upload, History, Download, FileX, Loader2, FileText,
+  Landmark, Plus, Power, Trash2, Upload, History, Download, FileX, Loader2, FileText, RefreshCw,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { fmt } from "@/lib/mock-data";
 import { useStore, bankBalance } from "@/lib/store";
@@ -28,6 +28,8 @@ import { EmptyState } from "@/components/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { parseStatement, sha256Hex, type ParsedTx } from "@/lib/statement-parsers";
+import { classify } from "@/lib/tx-classifier";
 
 
 
@@ -64,13 +66,14 @@ function Page() {
 
 
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", short: "", iban: "", currency: "TRY", balance: 0, color: COLORS[0] });
+  const [form, setForm] = useState({ name: "", short: "", iban: "", accountNo: "", currency: "TRY", balance: 0, color: COLORS[0] });
+  const [uploadBankId, setUploadBankId] = useState<string | null>(null);
 
   const save = () => {
     if (!form.name) return toast.error("Banka adı girin");
     addBank(form);
     setOpen(false);
-    setForm({ name: "", short: "", iban: "", currency: "TRY", balance: 0, color: COLORS[0] });
+    setForm({ name: "", short: "", iban: "", accountNo: "", currency: "TRY", balance: 0, color: COLORS[0] });
     toast.success("Banka eklendi");
   };
 
@@ -94,6 +97,7 @@ function Page() {
                   <div><Label>Kısaltma</Label><Input value={form.short} onChange={(e) => setForm({ ...form, short: e.target.value.toUpperCase() })} /></div>
                 </div>
                 <div><Label>IBAN</Label><Input value={form.iban} onChange={(e) => setForm({ ...form, iban: e.target.value })} /></div>
+                <div><Label>Hesap No</Label><Input value={form.accountNo} onChange={(e) => setForm({ ...form, accountNo: e.target.value })} placeholder="Ör. 12345678-1" /></div>
                 <div className="grid grid-cols-2 gap-2">
                   <div><Label>Para Birimi</Label><Input value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })} /></div>
                   <div><Label>Açılış Bakiyesi</Label><Input type="number" value={form.balance} onChange={(e) => setForm({ ...form, balance: +e.target.value })} /></div>
@@ -118,7 +122,7 @@ function Page() {
         }
       />
 
-      <BankStatementsSection />
+      <BankStatementsSection uploadBankId={uploadBankId} setUploadBankId={setUploadBankId} />
 
 
       {banks.length === 0 ? (
@@ -149,6 +153,7 @@ function Page() {
                 </div>
                 <div className="mt-3 text-base font-semibold">{b.name}</div>
                 <div className="mt-1 text-xs font-mono text-muted-foreground truncate">{b.iban || "—"}</div>
+                {b.accountNo && <div className="text-[11px] text-muted-foreground">Hesap No: {b.accountNo}</div>}
                 <div className="mt-4 text-xs text-muted-foreground">Güncel Bakiye</div>
                 <div className="text-2xl font-bold tracking-tight">{fmt(bankBalance(b.id), b.currency)}</div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
@@ -162,12 +167,32 @@ function Page() {
                   </div>
                 </div>
                 <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
-                  <span>Son: {mm.last || "—"}</span>
+                  <span>Son Ekstre: {b.lastStatementDate || mm.last || "—"}</span>
                   <span>{mm.count} hareket</span>
                 </div>
-                <Link to="/bankalar/$id" params={{ id: b.id }}>
-                  <Button variant="outline" size="sm" className="mt-4 w-full">Hareketler</Button>
-                </Link>
+                <div className="mt-3 grid grid-cols-5 gap-1">
+                  <Button size="sm" variant="outline" title="Ekstre Yükle" onClick={() => setUploadBankId(b.id)}>
+                    <Upload className="h-4 w-4" />
+                  </Button>
+                  <Link to="/bankalar/ekstre-gecmisi" className="contents">
+                    <Button size="sm" variant="outline" className="w-full" title="Ekstre Geçmişi">
+                      <History className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <Link to="/bankalar/$id" params={{ id: b.id }} className="contents">
+                    <Button size="sm" variant="outline" className="w-full" title="Hareketleri Görüntüle">
+                      <FileText className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <Button size="sm" variant="outline" title="Yenile"
+                    onClick={() => { updateBank(b.id, {}); toast.success("Yenilendi"); }}>
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="outline" title="Hesabı Sil"
+                    onClick={() => { if (confirm(`${b.name} silinsin mi?`)) removeBank(b.id); }}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
               </CardContent>
             </Card>
             );
@@ -194,8 +219,8 @@ type BankStatement = {
   created_at: string;
 };
 
-const ACCEPTED_EXT = ["pdf", "xlsx", "xls", "csv"];
-const ACCEPT_ATTR = ".pdf,.xlsx,.xls,.csv,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv";
+const ACCEPTED_EXT = ["pdf", "xlsx", "xls", "csv", "mt940", "sta", "txt"];
+const ACCEPT_ATTR = ".pdf,.xlsx,.xls,.csv,.mt940,.sta,.txt,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain";
 
 function formatSize(n: number) {
   if (!n) return "—";
@@ -205,11 +230,18 @@ function formatSize(n: number) {
   return `${v.toFixed(v >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
-function BankStatementsSection() {
+function BankStatementsSection({
+  uploadBankId, setUploadBankId,
+}: { uploadBankId: string | null; setUploadBankId: (id: string | null) => void }) {
   const qc = useQueryClient();
   const banks = useStore((s) => s.banks);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<BankStatement | null>(null);
+
+  // auto-open when a per-card upload button is clicked
+  useEffect(() => {
+    if (uploadBankId) setUploadOpen(true);
+  }, [uploadBankId]);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["bank-statements"],
@@ -355,8 +387,9 @@ function BankStatementsSection() {
 
       <UploadStatementDialog
         open={uploadOpen}
-        onOpenChange={setUploadOpen}
+        onOpenChange={(v) => { setUploadOpen(v); if (!v) setUploadBankId(null); }}
         banks={banks}
+        preselectedBankId={uploadBankId}
         onUploaded={() => qc.invalidateQueries({ queryKey: ["bank-statements"] })}
       />
 
@@ -415,102 +448,182 @@ function ActionCard({
 }
 
 function UploadStatementDialog({
-  open, onOpenChange, banks, onUploaded,
+  open, onOpenChange, banks, preselectedBankId, onUploaded,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  banks: { id: string; name: string }[];
+  banks: { id: string; name: string; accountNo?: string }[];
+  preselectedBankId: string | null;
   onUploaded: () => void;
 }) {
-  const [bankName, setBankName] = useState("");
+  const bulkAddBankTx = useStore((s) => s.bulkAddBankTx);
+  const updateBank = useStore((s) => s.updateBank);
+  const existingBankTx = useStore((s) => s.bankTx);
+
+  const [bankId, setBankId] = useState<string>("");
   const [accountName, setAccountName] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [summary, setSummary] = useState<{ total: number; imported: number; skipped: number; income: number; expense: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open && preselectedBankId) setBankId(preselectedBankId);
+  }, [open, preselectedBankId]);
+
+  const selectedBank = banks.find((b) => b.id === bankId);
 
   const upload = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error("Dosya seçin");
+      if (!bankId) throw new Error("Banka seçin");
       const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-      if (!ACCEPTED_EXT.includes(ext)) throw new Error("Sadece PDF, XLSX, XLS, CSV desteklenir");
+      if (!ACCEPTED_EXT.includes(ext)) throw new Error("Sadece PDF, XLSX, XLS, CSV, MT940 desteklenir");
+
       const { data: userData, error: userErr } = await supabase.auth.getUser();
       if (userErr || !userData.user) throw new Error("Oturum bulunamadı");
       const uid = userData.user.id;
       const safe = file.name.replace(/[^\w.\-]+/g, "_");
       const path = `${uid}/${Date.now()}_${safe}`;
+
       const { error: upErr } = await supabase.storage
         .from("bank-statements")
         .upload(path, file, { contentType: file.type || undefined, upsert: false });
       if (upErr) throw upErr;
+
+      // Parse
+      let parsed: ParsedTx[] = [];
+      try {
+        const res = await parseStatement(file);
+        parsed = res.transactions;
+      } catch (e) {
+        console.warn("parse failed", e);
+      }
+
+      // Dedupe by hash against existing txs for this bank
+      const existingHashes = new Set(
+        existingBankTx
+          .filter((t) => t.bankId === bankId)
+          .map((t) => `${t.date}|${t.amount}|${(t.description || "").slice(0, 60)}`)
+      );
+
+      const toInsert: Omit<import("@/lib/mock-data").BankTx, "id">[] = [];
+      let skipped = 0;
+      let income = 0;
+      let expense = 0;
+      let lastDate = "";
+
+      for (const p of parsed) {
+        const key = `${p.date}|${p.amount}|${(p.description || "").slice(0, 60)}`;
+        if (existingHashes.has(key)) { skipped++; continue; }
+        const cls = classify(p.description, p.amount);
+        toInsert.push({
+          bankId,
+          date: p.date,
+          description: p.description,
+          category: cls.category,
+          amount: p.amount,
+        });
+        if (p.amount >= 0) income += p.amount; else expense += -p.amount;
+        if (!lastDate || p.date > lastDate) lastDate = p.date;
+      }
+
+      if (toInsert.length) bulkAddBankTx(toInsert);
+      if (lastDate) updateBank(bankId, { lastStatementDate: lastDate });
+
+      const bankName = selectedBank?.name ?? "—";
       const { error: dbErr } = await supabase.from("bank_statements").insert({
         user_id: uid,
-        bank_name: bankName || "—",
-        account_name: accountName || "—",
+        bank_name: bankName,
+        account_name: accountName || selectedBank?.accountNo || "—",
         file_name: file.name,
         file_path: path,
         file_size: file.size,
         mime_type: file.type || ext,
-        status: "uploaded",
+        status: parsed.length ? "parsed" : "uploaded",
       });
       if (dbErr) {
         await supabase.storage.from("bank-statements").remove([path]);
         throw dbErr;
       }
+
+      return { total: parsed.length, imported: toInsert.length, skipped, income, expense };
     },
-    onSuccess: () => {
-      toast.success("Ekstre yüklendi");
-      setBankName(""); setAccountName(""); setFile(null);
-      if (inputRef.current) inputRef.current.value = "";
-      onOpenChange(false);
+    onSuccess: (res) => {
+      setSummary(res);
+      toast.success(`Ekstre yüklendi — ${res.imported} yeni hareket, ${res.skipped} tekrar`);
       onUploaded();
     },
     onError: (e: unknown) => toast.error((e as Error).message || "Yüklenemedi"),
   });
 
+  const close = () => {
+    setBankId(""); setAccountName(""); setFile(null); setSummary(null);
+    if (inputRef.current) inputRef.current.value = "";
+    onOpenChange(false);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) close(); else onOpenChange(v); }}>
       <DialogContent>
         <DialogHeader><DialogTitle>Ekstre Yükle</DialogTitle></DialogHeader>
-        <div className="grid gap-3">
-          <div>
-            <Label>Banka</Label>
-            {banks.length > 0 ? (
-              <Select value={bankName} onValueChange={setBankName}>
-                <SelectTrigger><SelectValue placeholder="Banka seçin veya yazın" /></SelectTrigger>
-                <SelectContent>
-                  {banks.map((b) => <SelectItem key={b.id} value={b.name}>{b.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            ) : (
-              <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="Ör. Vakıfbank" />
-            )}
+
+        {summary ? (
+          <div className="grid gap-3">
+            <div className="rounded-lg border p-4 space-y-2">
+              <div className="text-sm font-semibold">Özet</div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>Toplam Satır</div><div className="text-right font-medium">{summary.total}</div>
+                <div>Aktarılan</div><div className="text-right font-medium text-success">{summary.imported}</div>
+                <div>Tekrar (Atlandı)</div><div className="text-right font-medium text-muted-foreground">{summary.skipped}</div>
+                <div>Toplam Gelen</div><div className="text-right font-medium text-success">{fmt(summary.income)}</div>
+                <div>Toplam Giden</div><div className="text-right font-medium text-destructive">{fmt(summary.expense)}</div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button className="gradient-primary text-primary-foreground" onClick={close}>Tamam</Button>
+            </DialogFooter>
           </div>
-          <div>
-            <Label>Hesap Adı</Label>
-            <Input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="Ör. TL Ticari" />
-          </div>
-          <div>
-            <Label>Dosya</Label>
-            <Input
-              ref={inputRef}
-              type="file"
-              accept={ACCEPT_ATTR}
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            />
-            {file && (
-              <p className="mt-1 text-xs text-muted-foreground">{file.name} — {formatSize(file.size)}</p>
-            )}
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>İptal</Button>
-          <Button
-            className="gradient-primary text-primary-foreground"
-            disabled={!file || upload.isPending}
-            onClick={() => upload.mutate()}
-          >
-            {upload.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Yükleniyor</> : <><Upload className="mr-1 h-4 w-4" /> Yükle</>}
-          </Button>
-        </DialogFooter>
+        ) : (
+          <>
+            <div className="grid gap-3">
+              <div>
+                <Label>Banka</Label>
+                <Select value={bankId} onValueChange={setBankId}>
+                  <SelectTrigger><SelectValue placeholder="Banka seçin" /></SelectTrigger>
+                  <SelectContent>
+                    {banks.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Hesap Adı (opsiyonel)</Label>
+                <Input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="Ör. TL Ticari" />
+              </div>
+              <div>
+                <Label>Dosya (PDF, XLSX, CSV, MT940)</Label>
+                <Input
+                  ref={inputRef}
+                  type="file"
+                  accept={ACCEPT_ATTR}
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                />
+                {file && (
+                  <p className="mt-1 text-xs text-muted-foreground">{file.name} — {formatSize(file.size)}</p>
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={close}>İptal</Button>
+              <Button
+                className="gradient-primary text-primary-foreground"
+                disabled={!file || !bankId || upload.isPending}
+                onClick={() => upload.mutate()}
+              >
+                {upload.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Yükleniyor</> : <><Upload className="mr-1 h-4 w-4" /> Yükle ve Aktar</>}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

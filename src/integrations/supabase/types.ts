@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounting_entries: {
+        Row: {
+          amount: number
+          category: string | null
+          created_at: string
+          description: string | null
+          entry_date: string
+          entry_type: string
+          id: string
+          source: string
+          transaction_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          entry_date: string
+          entry_type: string
+          id?: string
+          source?: string
+          transaction_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          entry_date?: string
+          entry_type?: string
+          id?: string
+          source?: string
+          transaction_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       bank_imports: {
         Row: {
           bank_id: string
@@ -58,89 +97,130 @@ export type Database = {
       bank_statements: {
         Row: {
           account_name: string
+          bank_id: string | null
           bank_name: string
           created_at: string
+          file_hash: string | null
           file_name: string
           file_path: string
           file_size: number
           id: string
           mime_type: string | null
+          period_end: string | null
+          period_start: string | null
           status: string
+          summary: Json | null
+          tx_count: number
           updated_at: string
           user_id: string
         }
         Insert: {
           account_name?: string
+          bank_id?: string | null
           bank_name?: string
           created_at?: string
+          file_hash?: string | null
           file_name: string
           file_path: string
           file_size?: number
           id?: string
           mime_type?: string | null
+          period_end?: string | null
+          period_start?: string | null
           status?: string
+          summary?: Json | null
+          tx_count?: number
           updated_at?: string
           user_id: string
         }
         Update: {
           account_name?: string
+          bank_id?: string | null
           bank_name?: string
           created_at?: string
+          file_hash?: string | null
           file_name?: string
           file_path?: string
           file_size?: number
           id?: string
           mime_type?: string | null
+          period_end?: string | null
+          period_start?: string | null
           status?: string
+          summary?: Json | null
+          tx_count?: number
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "bank_statements_bank_id_fkey"
+            columns: ["bank_id"]
+            isOneToOne: false
+            referencedRelation: "banks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       bank_transactions: {
         Row: {
           balance: number | null
           bank_id: string
+          category: string | null
           created_at: string
           credit: number
           currency: string | null
           date: string
           debit: number
           description: string
+          direction: string | null
           id: string
           import_id: string | null
+          matched_customer_id: string | null
+          matched_invoice_id: string | null
           ref_no: string | null
           source: string
+          statement_id: string | null
           user_id: string
         }
         Insert: {
           balance?: number | null
           bank_id: string
+          category?: string | null
           created_at?: string
           credit?: number
           currency?: string | null
           date: string
           debit?: number
           description?: string
+          direction?: string | null
           id?: string
           import_id?: string | null
+          matched_customer_id?: string | null
+          matched_invoice_id?: string | null
           ref_no?: string | null
           source?: string
+          statement_id?: string | null
           user_id: string
         }
         Update: {
           balance?: number | null
           bank_id?: string
+          category?: string | null
           created_at?: string
           credit?: number
           currency?: string | null
           date?: string
           debit?: number
           description?: string
+          direction?: string | null
           id?: string
           import_id?: string | null
+          matched_customer_id?: string | null
+          matched_invoice_id?: string | null
           ref_no?: string | null
           source?: string
+          statement_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -158,16 +238,27 @@ export type Database = {
             referencedRelation: "bank_imports"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "bank_transactions_statement_id_fkey"
+            columns: ["statement_id"]
+            isOneToOne: false
+            referencedRelation: "bank_statements"
+            referencedColumns: ["id"]
+          },
         ]
       }
       banks: {
         Row: {
           account_name: string | null
+          account_no: string | null
+          active: boolean
           created_at: string
           currency: string
+          current_balance: number
           description: string | null
           iban: string | null
           id: string
+          last_statement_date: string | null
           logo_url: string | null
           name: string
           updated_at: string
@@ -175,11 +266,15 @@ export type Database = {
         }
         Insert: {
           account_name?: string | null
+          account_no?: string | null
+          active?: boolean
           created_at?: string
           currency?: string
+          current_balance?: number
           description?: string | null
           iban?: string | null
           id?: string
+          last_statement_date?: string | null
           logo_url?: string | null
           name: string
           updated_at?: string
@@ -187,17 +282,95 @@ export type Database = {
         }
         Update: {
           account_name?: string | null
+          account_no?: string | null
+          active?: boolean
           created_at?: string
           currency?: string
+          current_balance?: number
           description?: string | null
           iban?: string | null
           id?: string
+          last_statement_date?: string | null
           logo_url?: string | null
           name?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: []
+      }
+      customers: {
+        Row: {
+          balance: number
+          created_at: string
+          id: string
+          name: string
+          tax_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string
+          id?: string
+          name: string
+          tax_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          id?: string
+          name?: string
+          tax_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      invoices: {
+        Row: {
+          amount: number
+          created_at: string
+          customer_id: string | null
+          id: string
+          invoice_date: string | null
+          invoice_no: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          invoice_date?: string | null
+          invoice_no: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          invoice_date?: string | null
+          invoice_no?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_data: {
         Row: {
