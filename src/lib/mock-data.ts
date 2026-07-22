@@ -59,10 +59,12 @@ export type Bank = {
   name: string;
   short: string;
   iban: string;
+  accountNo?: string;
   currency: string;
   balance: number; // açılış bakiyesi
   color: string;
   active?: boolean; // pasif yapıldıysa false
+  lastStatementDate?: string; // ISO
 };
 
 
