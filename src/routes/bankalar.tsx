@@ -515,7 +515,7 @@ function UploadStatementDialog({
       for (const p of parsed) {
         const key = `${p.date}|${p.amount}|${(p.description || "").slice(0, 60)}`;
         if (existingHashes.has(key)) { skipped++; continue; }
-        const cls = classify(p.description);
+        const cls = classify(p.description, p.amount);
         toInsert.push({
           bankId,
           date: p.date,
