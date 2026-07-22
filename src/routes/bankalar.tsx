@@ -239,9 +239,9 @@ function BankStatementsSection({
   const [deleteTarget, setDeleteTarget] = useState<BankStatement | null>(null);
 
   // auto-open when a per-card upload button is clicked
-  if (uploadBankId && !uploadOpen) {
-    setUploadOpen(true);
-  }
+  useEffect(() => {
+    if (uploadBankId) setUploadOpen(true);
+  }, [uploadBankId]);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["bank-statements"],
