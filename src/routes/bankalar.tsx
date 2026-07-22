@@ -122,7 +122,7 @@ function Page() {
         }
       />
 
-      <BankStatementsSection />
+      <BankStatementsSection uploadBankId={uploadBankId} setUploadBankId={setUploadBankId} />
 
 
       {banks.length === 0 ? (
@@ -153,6 +153,7 @@ function Page() {
                 </div>
                 <div className="mt-3 text-base font-semibold">{b.name}</div>
                 <div className="mt-1 text-xs font-mono text-muted-foreground truncate">{b.iban || "—"}</div>
+                {b.accountNo && <div className="text-[11px] text-muted-foreground">Hesap No: {b.accountNo}</div>}
                 <div className="mt-4 text-xs text-muted-foreground">Güncel Bakiye</div>
                 <div className="text-2xl font-bold tracking-tight">{fmt(bankBalance(b.id), b.currency)}</div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
@@ -166,12 +167,32 @@ function Page() {
                   </div>
                 </div>
                 <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
-                  <span>Son: {mm.last || "—"}</span>
+                  <span>Son Ekstre: {b.lastStatementDate || mm.last || "—"}</span>
                   <span>{mm.count} hareket</span>
                 </div>
-                <Link to="/bankalar/$id" params={{ id: b.id }}>
-                  <Button variant="outline" size="sm" className="mt-4 w-full">Hareketler</Button>
-                </Link>
+                <div className="mt-3 grid grid-cols-5 gap-1">
+                  <Button size="sm" variant="outline" title="Ekstre Yükle" onClick={() => setUploadBankId(b.id)}>
+                    <Upload className="h-4 w-4" />
+                  </Button>
+                  <Link to="/bankalar/ekstre-gecmisi" className="contents">
+                    <Button size="sm" variant="outline" className="w-full" title="Ekstre Geçmişi">
+                      <History className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <Link to="/bankalar/$id" params={{ id: b.id }} className="contents">
+                    <Button size="sm" variant="outline" className="w-full" title="Hareketleri Görüntüle">
+                      <FileText className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <Button size="sm" variant="outline" title="Yenile"
+                    onClick={() => { updateBank(b.id, {}); toast.success("Yenilendi"); }}>
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="outline" title="Hesabı Sil"
+                    onClick={() => { if (confirm(`${b.name} silinsin mi?`)) removeBank(b.id); }}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
               </CardContent>
             </Card>
             );
