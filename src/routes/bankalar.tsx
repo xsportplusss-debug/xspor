@@ -66,13 +66,14 @@ function Page() {
 
 
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", short: "", iban: "", currency: "TRY", balance: 0, color: COLORS[0] });
+  const [form, setForm] = useState({ name: "", short: "", iban: "", accountNo: "", currency: "TRY", balance: 0, color: COLORS[0] });
+  const [uploadBankId, setUploadBankId] = useState<string | null>(null);
 
   const save = () => {
     if (!form.name) return toast.error("Banka adı girin");
     addBank(form);
     setOpen(false);
-    setForm({ name: "", short: "", iban: "", currency: "TRY", balance: 0, color: COLORS[0] });
+    setForm({ name: "", short: "", iban: "", accountNo: "", currency: "TRY", balance: 0, color: COLORS[0] });
     toast.success("Banka eklendi");
   };
 
