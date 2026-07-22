@@ -448,102 +448,181 @@ function ActionCard({
 }
 
 function UploadStatementDialog({
-  open, onOpenChange, banks, onUploaded,
+  open, onOpenChange, banks, preselectedBankId, onUploaded,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  banks: { id: string; name: string }[];
+  banks: { id: string; name: string; accountNo?: string }[];
+  preselectedBankId: string | null;
   onUploaded: () => void;
 }) {
-  const [bankName, setBankName] = useState("");
+  const bulkAddBankTx = useStore((s) => s.bulkAddBankTx);
+  const updateBank = useStore((s) => s.updateBank);
+  const existingBankTx = useStore((s) => s.bankTx);
+
+  const [bankId, setBankId] = useState<string>("");
   const [accountName, setAccountName] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [summary, setSummary] = useState<{ total: number; imported: number; skipped: number; income: number; expense: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open && preselectedBankId) setBankId(preselectedBankId);
+  }, [open, preselectedBankId]);
+
+  const selectedBank = banks.find((b) => b.id === bankId);
 
   const upload = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error("Dosya seçin");
+      if (!bankId) throw new Error("Banka seçin");
       const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-      if (!ACCEPTED_EXT.includes(ext)) throw new Error("Sadece PDF, XLSX, XLS, CSV desteklenir");
+      if (!ACCEPTED_EXT.includes(ext)) throw new Error("Sadece PDF, XLSX, XLS, CSV, MT940 desteklenir");
+
       const { data: userData, error: userErr } = await supabase.auth.getUser();
       if (userErr || !userData.user) throw new Error("Oturum bulunamadı");
       const uid = userData.user.id;
       const safe = file.name.replace(/[^\w.\-]+/g, "_");
       const path = `${uid}/${Date.now()}_${safe}`;
+
       const { error: upErr } = await supabase.storage
         .from("bank-statements")
         .upload(path, file, { contentType: file.type || undefined, upsert: false });
       if (upErr) throw upErr;
+
+      // Parse
+      let parsed: ParsedTx[] = [];
+      try {
+        parsed = await parseStatement(file);
+      } catch (e) {
+        console.warn("parse failed", e);
+      }
+
+      // Dedupe by hash against existing txs for this bank
+      const existingHashes = new Set(
+        existingBankTx
+          .filter((t) => t.bankId === bankId)
+          .map((t) => `${t.date}|${t.amount}|${(t.description || "").slice(0, 60)}`)
+      );
+
+      const toInsert: Omit<import("@/lib/mock-data").BankTx, "id">[] = [];
+      let skipped = 0;
+      let income = 0;
+      let expense = 0;
+      let lastDate = "";
+
+      for (const p of parsed) {
+        const key = `${p.date}|${p.amount}|${(p.description || "").slice(0, 60)}`;
+        if (existingHashes.has(key)) { skipped++; continue; }
+        const cls = classify(p.description);
+        toInsert.push({
+          bankId,
+          date: p.date,
+          description: p.description,
+          category: cls.category,
+          amount: p.amount,
+        });
+        if (p.amount >= 0) income += p.amount; else expense += -p.amount;
+        if (!lastDate || p.date > lastDate) lastDate = p.date;
+      }
+
+      if (toInsert.length) bulkAddBankTx(toInsert);
+      if (lastDate) updateBank(bankId, { lastStatementDate: lastDate });
+
+      const bankName = selectedBank?.name ?? "—";
       const { error: dbErr } = await supabase.from("bank_statements").insert({
         user_id: uid,
-        bank_name: bankName || "—",
-        account_name: accountName || "—",
+        bank_name: bankName,
+        account_name: accountName || selectedBank?.accountNo || "—",
         file_name: file.name,
         file_path: path,
         file_size: file.size,
         mime_type: file.type || ext,
-        status: "uploaded",
+        status: parsed.length ? "parsed" : "uploaded",
       });
       if (dbErr) {
         await supabase.storage.from("bank-statements").remove([path]);
         throw dbErr;
       }
+
+      return { total: parsed.length, imported: toInsert.length, skipped, income, expense };
     },
-    onSuccess: () => {
-      toast.success("Ekstre yüklendi");
-      setBankName(""); setAccountName(""); setFile(null);
-      if (inputRef.current) inputRef.current.value = "";
-      onOpenChange(false);
+    onSuccess: (res) => {
+      setSummary(res);
+      toast.success(`Ekstre yüklendi — ${res.imported} yeni hareket, ${res.skipped} tekrar`);
       onUploaded();
     },
     onError: (e: unknown) => toast.error((e as Error).message || "Yüklenemedi"),
   });
 
+  const close = () => {
+    setBankId(""); setAccountName(""); setFile(null); setSummary(null);
+    if (inputRef.current) inputRef.current.value = "";
+    onOpenChange(false);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) close(); else onOpenChange(v); }}>
       <DialogContent>
         <DialogHeader><DialogTitle>Ekstre Yükle</DialogTitle></DialogHeader>
-        <div className="grid gap-3">
-          <div>
-            <Label>Banka</Label>
-            {banks.length > 0 ? (
-              <Select value={bankName} onValueChange={setBankName}>
-                <SelectTrigger><SelectValue placeholder="Banka seçin veya yazın" /></SelectTrigger>
-                <SelectContent>
-                  {banks.map((b) => <SelectItem key={b.id} value={b.name}>{b.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            ) : (
-              <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="Ör. Vakıfbank" />
-            )}
+
+        {summary ? (
+          <div className="grid gap-3">
+            <div className="rounded-lg border p-4 space-y-2">
+              <div className="text-sm font-semibold">Özet</div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>Toplam Satır</div><div className="text-right font-medium">{summary.total}</div>
+                <div>Aktarılan</div><div className="text-right font-medium text-success">{summary.imported}</div>
+                <div>Tekrar (Atlandı)</div><div className="text-right font-medium text-muted-foreground">{summary.skipped}</div>
+                <div>Toplam Gelen</div><div className="text-right font-medium text-success">{fmt(summary.income)}</div>
+                <div>Toplam Giden</div><div className="text-right font-medium text-destructive">{fmt(summary.expense)}</div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button className="gradient-primary text-primary-foreground" onClick={close}>Tamam</Button>
+            </DialogFooter>
           </div>
-          <div>
-            <Label>Hesap Adı</Label>
-            <Input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="Ör. TL Ticari" />
-          </div>
-          <div>
-            <Label>Dosya</Label>
-            <Input
-              ref={inputRef}
-              type="file"
-              accept={ACCEPT_ATTR}
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            />
-            {file && (
-              <p className="mt-1 text-xs text-muted-foreground">{file.name} — {formatSize(file.size)}</p>
-            )}
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>İptal</Button>
-          <Button
-            className="gradient-primary text-primary-foreground"
-            disabled={!file || upload.isPending}
-            onClick={() => upload.mutate()}
-          >
-            {upload.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Yükleniyor</> : <><Upload className="mr-1 h-4 w-4" /> Yükle</>}
-          </Button>
-        </DialogFooter>
+        ) : (
+          <>
+            <div className="grid gap-3">
+              <div>
+                <Label>Banka</Label>
+                <Select value={bankId} onValueChange={setBankId}>
+                  <SelectTrigger><SelectValue placeholder="Banka seçin" /></SelectTrigger>
+                  <SelectContent>
+                    {banks.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Hesap Adı (opsiyonel)</Label>
+                <Input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="Ör. TL Ticari" />
+              </div>
+              <div>
+                <Label>Dosya (PDF, XLSX, CSV, MT940)</Label>
+                <Input
+                  ref={inputRef}
+                  type="file"
+                  accept={ACCEPT_ATTR}
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                />
+                {file && (
+                  <p className="mt-1 text-xs text-muted-foreground">{file.name} — {formatSize(file.size)}</p>
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={close}>İptal</Button>
+              <Button
+                className="gradient-primary text-primary-foreground"
+                disabled={!file || !bankId || upload.isPending}
+                onClick={() => upload.mutate()}
+              >
+                {upload.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Yükleniyor</> : <><Upload className="mr-1 h-4 w-4" /> Yükle ve Aktar</>}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
