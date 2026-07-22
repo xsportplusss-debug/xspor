@@ -219,8 +219,8 @@ type BankStatement = {
   created_at: string;
 };
 
-const ACCEPTED_EXT = ["pdf", "xlsx", "xls", "csv"];
-const ACCEPT_ATTR = ".pdf,.xlsx,.xls,.csv,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv";
+const ACCEPTED_EXT = ["pdf", "xlsx", "xls", "csv", "mt940", "sta", "txt"];
+const ACCEPT_ATTR = ".pdf,.xlsx,.xls,.csv,.mt940,.sta,.txt,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/plain";
 
 function formatSize(n: number) {
   if (!n) return "—";
