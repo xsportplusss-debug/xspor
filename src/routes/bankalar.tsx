@@ -387,8 +387,9 @@ function BankStatementsSection({
 
       <UploadStatementDialog
         open={uploadOpen}
-        onOpenChange={setUploadOpen}
+        onOpenChange={(v) => { setUploadOpen(v); if (!v) setUploadBankId(null); }}
         banks={banks}
+        preselectedBankId={uploadBankId}
         onUploaded={() => qc.invalidateQueries({ queryKey: ["bank-statements"] })}
       />
 
