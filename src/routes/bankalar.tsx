@@ -493,7 +493,8 @@ function UploadStatementDialog({
       // Parse
       let parsed: ParsedTx[] = [];
       try {
-        parsed = await parseStatement(file);
+        const res = await parseStatement(file);
+        parsed = res.transactions;
       } catch (e) {
         console.warn("parse failed", e);
       }
