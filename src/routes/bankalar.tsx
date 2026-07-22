@@ -20,7 +20,7 @@ import {
 import {
   Landmark, Plus, Power, Trash2, Upload, History, Download, FileX, Loader2, FileText, RefreshCw,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { fmt } from "@/lib/mock-data";
 import { useStore, bankBalance } from "@/lib/store";
