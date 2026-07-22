@@ -1,54 +1,89 @@
+# Bankalar Modülü — Uygulama Planı
 
-# Fintra Genişletme Planı
+Mevcut çalışan özellikler korunacak. Sadece Bankalar akışı ve ilişkili muhasebe entegrasyonu genişletilecek. Erişim yalnızca **xsportplusss@gmail.com** hesabıyla sınırlı kalacak (mevcut AuthGate zaten bu kısıtı uyguluyor — server tarafında da doğrulama eklenecek).
 
-Mevcut sistem korunacak. Hiçbir tablo, route veya store alanı silinmeyecek. Tüm yenilikler **modüler** ve **ek** olarak gelecek. Gerçek API bağlantıları şimdilik yok — servis katmanı hazır, mock ile çalışır, ileride kolayca gerçek API'ye bağlanır.
+## 1. Veritabanı (Lovable Cloud)
 
-## 1. Servis Katmanı (yeni)
-- `src/services/e-invoice/` — E-Fatura servisi (mock adapter + interface)
-- `src/services/marketplaces/` — her pazaryeri için ayrı adapter (Trendyol, Hepsiburada, N11, Amazon, Pazarama, ÇiçekSepeti, PTTAVM, idefix, Turkcell Pasaj) — ortak `MarketplaceAdapter` arayüzü
-- Gelecekte gerçek `fetch` çağrıları bu dosyalara eklenecek.
+Yeni/yenilenen tablolar (hepsi RLS + `user_id = auth.uid()` politikası ile):
 
-## 2. Store Genişletmeleri (kırılmadan)
-`src/lib/store.ts` içine yeni alanlar eklenir, eskiler dokunulmaz:
-- `eInvoiceConfig`, `eInvoiceLastSync`
-- `marketplaceConfigs: Record<string, {...}>`
-- `marketplaceOrders: MarketplaceOrder[]`
-- `cashTx.category` (opsiyonel yeni alan)
-- `banks.active` (opsiyonel — pasif/aktif)
-- Invoice tipine opsiyonel `source: "manual" | "e-invoice"` + `uuid` (duplicate kontrolü)
+- `banks` — banka_adi, iban, hesap_no, para_birimi, aktif, guncel_bakiye, son_ekstre_tarihi
+- `bank_accounts` — çoklu hesap desteği (bank_id, hesap_adi, iban, hesap_no, bakiye)
+- `bank_statements` (mevcut, genişletilecek) — bank_account_id, donem_baslangic, donem_bitis, dosya_hash (duplicate önleme), islem_sayisi, durum
+- `statement_files` — orijinal dosya referansı (storage path, mime, size, uploaded_by)
+- `statement_transactions` — statement_id, tarih, aciklama, tutar, borc, alacak, bakiye, referans_no, kategori, matched_invoice_id, matched_customer_id
+- `accounting_entries` — transaction_id, tip (gelir/gider/tahsilat/ödeme/komisyon/vergi), kategori, tutar, tarih
+- `customers` (yoksa) — ad, vkn/tckn, bakiye
+- `invoices` (yoksa) — fatura_no, musteri_id, tutar, durum, tarih
 
-## 3. Yeni Rotalar
-- `/e-fatura-entegrasyon` — Config formu, "Bağlantıyı Test Et", "Faturaları Çek", son senkron tarihi
-- `/pazaryerleri/ayarlar` — Her pazaryeri için API config kartı, "Bağlı" rozeti, "Siparişleri Çek"
-- Mevcut pazaryeri sayfalarına yeni pazaryerleri eklenir (ÇiçekSepeti, PTTAVM, idefix, Turkcell Pasaj) — mevcutlar aynı kalır
+Storage: mevcut `bank-statements` bucket'ı kullanılacak; RLS `{user_id}/` klasör kuralı.
 
-## 4. Modül İyileştirmeleri
-- **Bankalar**: Pasif yap, Düzenle, kartta Toplam Gelen/Giden/Son Hareket/Adet. CSV import eklenir (Excel/PDF zaten var).
-- **Ürünler**: Kur alanı UI'dan kaldırılır (mevcut veriler bozulmaz, alan opsiyonel kalır). Yeni Ürün formu sadeleşir.
-- **Fiyat Teklifi**: Para birimi seçimi USD/EUR/GBP/TL genişletilir, kur teklif özelinde çalışır (zaten benzer, GBP eklenir).
-- **Kasa**: Nakit Giriş/Çıkış dialoglarına kategori seçici (Yemek, Yakıt, Kargo, Market, Personel, Ofis, Reklam, Diğer).
-- **Gelirler / Giderler**: Mevcut sayfalar zenginleştirilir — kaynak filtresi (Banka/Kasa/Pazaryeri/Diğer), kategori renk kodları, toplam kart.
-- **Dashboard**: Yeni kartlar (Bugünkü Ciro/Tahsilat/Gider, Bekleyen Tahsilat/Borç, Pazaryeri Siparişleri, Net Kâr, E-Fatura yeşil rozet).
+## 2. Bankalar Sayfası (`/bankalar`)
 
-## 5. Entegrasyon
-- Pazaryeri siparişleri çekildiğinde otomatik `bankTx` benzeri hareket + `marketplaceOrders` kaydı → Gelir/Gider/Dashboard otomatik yansır.
-- E-Fatura çekimi → mevcut `salesInvoices`/`purchaseInvoices` içine UUID/no bazlı duplicate check ile eklenir, `source: "e-invoice"` etiketi.
-- Kasa/Banka hareketleri zaten Gelir/Gider'e yansıyor; kategori bilgisi de aktarılır.
+Banka kartları grid:
+- Banka Adı · IBAN · Hesap No · Güncel Bakiye · Son Ekstre Tarihi
+- Aksiyonlar: **Ekstre Yükle · Ekstre Geçmişi · İndir · Sil · Yenile**
+- Üstte "Yeni Banka Ekle" ve genel özet (toplam bakiye).
 
-## 6. Dokunulmayacaklar
-- Supabase şeması (user_data JSON blob — genişleme otomatik)
-- Auth akışı, Drive yedek, mevcut Excel/PDF importerlar
-- Mevcut route yolları ve isimleri
-- localStorage anahtarı `fintra:v1`
+## 3. Ekstre Yükleme
+
+Kabul edilen formatlar: **PDF, XLSX, CSV, MT940**.
+
+Sunucu tarafı server function (`createServerFn` + `requireSupabaseAuth`):
+1. Dosyayı Storage'a yükle (`{user_id}/{bank_id}/{timestamp}-{filename}`).
+2. SHA-256 hash hesapla → duplicate kontrolü.
+3. Format tespiti → parser çalıştır:
+   - CSV/XLSX: başlık eşleme (Tarih, Açıklama, Borç, Alacak, Bakiye, Ref).
+   - PDF: `pdfjs-dist` ile text extract + regex satır ayrıştırma.
+   - MT940: `:61:` ve `:86:` bloklarını parse eden yerel parser.
+4. `bank_statements` + `statement_files` + `statement_transactions` kayıtları oluştur.
+5. Her transaction için otomatik kategorizasyon (anahtar kelime tabanlı):
+   - Trendyol/Hepsiburada/Amazon/N11/Pazarama → Satış Geliri
+   - Kargo → Kargo Gideri · Komisyon → Banka Komisyonu · POS → POS Kesintisi
+   - Vergi/SGK/Maaş/Kira/Elektrik → ilgili gider kategorisi
+6. `accounting_entries` üret, banka bakiyesini güncelle.
+7. Fatura eşleştirme: tutar + tarih + referans → varsa `invoices.durum = 'Ödendi'`.
+8. Cari eşleşmesi: açıklama içinde müşteri adı → `customers.bakiye` güncelle.
+
+Yükleme sonu özet modal: **Toplam İşlem · Gelir · Gider · Tahsilat · Ödeme · Komisyon · Bekleyen Eşleştirme · Hatalı Kayıt**.
+
+## 4. Ekstre Geçmişi Sayfası (`/bankalar/ekstre-gecmisi`)
+
+Tablo sütunları: Dosya Adı · Banka · Dönem · Yükleme Tarihi · İşlem Sayısı · Durum · Görüntüle · İndir · Sil
+
+- **Görüntüle**: transaction listesi drawer/dialog (kategori, eşleşme durumu, manuel düzeltme).
+- **Sil**: sadece dosyayı ve statement kaydını siler; `accounting_entries` ve `statement_transactions` korunur (onay diyaloğu).
+
+## 5. Diğer Modüllere Entegrasyon
+
+Import sonrası otomatik güncellenir:
+- **Cari Hesaplar** — müşteri bakiyeleri
+- **Gelir / Gider** — muhasebe kayıtları
+- **Kasa** — nakit hareketleri (varsa)
+- **Banka Bakiyesi** — son bakiye
+- **Finans Özeti / Nakit Akışı** — dashboard kartları
+
+## 6. Yetkilendirme
+
+- Client: mevcut `AuthGate` `xsportplusss@gmail.com` dışındaki kullanıcıları engelliyor — korunacak.
+- Server: her `createServerFn` `requireSupabaseAuth` middleware'i + email whitelist kontrolü (403 aksi halde).
+- RLS: tüm tablolarda `user_id = auth.uid()`.
+
+## 7. Teknik Notlar
+
+- React Query ile cache; mutations → `invalidateQueries`.
+- Parser modülleri `src/lib/statement-parsers/` altında (csv.ts, xlsx.ts, pdf.ts, mt940.ts).
+- Kategorizasyon kuralları `src/lib/tx-classifier.ts`.
+- UI mevcut tema tokenlarını kullanır (glass, shadow-elegant); mobil-first responsive grid.
 
 ## Uygulama Sırası
-1. Store + tip genişletmeleri
-2. Servis katmanı iskeleti (mock)
-3. E-Fatura rotası
-4. Pazaryeri config rotası + yeni pazaryeri sayfaları
-5. Kasa kategori, Ürünler UI sadeleştirme, GBP
-6. Bankalar kart metrikleri + pasif
-7. Gelir/Gider zenginleştirme
-8. Dashboard yeni kartlar
 
-Onaylarsan sırayla uygulamaya başlıyorum.
+1. DB migration (yeni tablolar + RLS + GRANT).
+2. Server functions (upload, list, parse, delete, classify, match).
+3. Parser + classifier modülleri.
+4. Bankalar sayfası UI yenileme (kartlar + aksiyonlar).
+5. Ekstre Geçmişi sayfası.
+6. Import özet modal + toast.
+7. Cari / Gelir-Gider / Dashboard entegrasyonları.
+8. E2E test: bir CSV yükle, kategorileri ve bakiyeyi doğrula.
+
+Onaylarsanız migration'dan başlayacağım.
