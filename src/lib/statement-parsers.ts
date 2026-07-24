@@ -56,6 +56,41 @@ function toISODate(v: unknown): string {
   return "";
 }
 
+function isIgnorablePdfLine(line: string): boolean {
+  return /^(HESAP ÖZETİ|Sayfa No:|Türkiye Halk Bankası|halkbank\.com\.tr|Müşteri Bilgileriniz|Hesap Bilgileriniz|Bakiye Bilgileriniz|İşlem Tarihi\s+İşlem Tutarı|Müşteri Numarası|Müşteri Adı|TCKN|Hesap No\s*:|IBAN\s*:|Şube Kodu|Hesap Türü|Döviz Cinsi|Hesap Adı|Hesap Özeti Bilgileriniz|Üretim Zamanı|Dönemi\s*:|Hesap Bakiyesi|Bloke Bakiyesi|Kullanılabilir|Toplam Kredi)/i.test(line);
+}
+
+function parsePdfTransactionLine(line: string): ParsedTx | null {
+  const clean = line.replace(/\s+/g, " ").trim();
+  const halkbank = clean.match(/^(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\s+(-?[\d.,]+)\s+(-?[\d.,]+)\s+(.+)$/);
+  if (halkbank) {
+    const date = toISODate(halkbank[1]);
+    const amount = toNumber(halkbank[2]);
+    if (!date || !amount) return null;
+    return {
+      date,
+      description: halkbank[4].trim() || "İşlem",
+      amount,
+      debit: amount < 0 ? Math.abs(amount) : undefined,
+      credit: amount > 0 ? amount : undefined,
+      balance: toNumber(halkbank[3]),
+    };
+  }
+
+  const endingAmount = clean.match(/^(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\s+(.+?)\s+(-?[\d.,]+)\s*(?:TL|TRY)?$/i);
+  if (!endingAmount) return null;
+  const date = toISODate(endingAmount[1]);
+  const amount = toNumber(endingAmount[3]);
+  if (!date || !amount) return null;
+  return {
+    date,
+    description: endingAmount[2].trim() || "İşlem",
+    amount,
+    debit: amount < 0 ? Math.abs(amount) : undefined,
+    credit: amount > 0 ? amount : undefined,
+  };
+}
+
 const HEADERS: Record<string, RegExp> = {
   date: /tarih|date|işlem\s*tar|islem\s*tar/i,
   description: /açıklama|aciklama|description|işlem|islem|detay/i,
@@ -218,26 +253,29 @@ export async function parsePDF(file: File): Promise<ParseResult> {
       const y = Math.round(item.transform[5]);
       const x = item.transform[4];
       if (!rowsMap.has(y)) rowsMap.set(y, []);
-      rowsMap.get(y)!.push({ x, str: item.str });
+      const row = rowsMap.get(y);
+      if (row) row.push({ x, str: item.str });
     }
     const ys = [...rowsMap.keys()].sort((a, b) => b - a);
     for (const y of ys) {
-      const parts = rowsMap.get(y)!.sort((a, b) => a.x - b.x).map((c) => c.str).join(" ");
+      const row = rowsMap.get(y);
+      if (!row) continue;
+      const parts = row.sort((a, b) => a.x - b.x).map((c) => c.str).join(" ");
       if (parts.trim()) lines.push(parts.trim());
     }
   }
   const txs: ParsedTx[] = [];
-  // Match: dd.mm.yyyy ... amount
-  const rowRe = /(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\s+(.+?)\s+(-?[\d\.,]+)\s*(?:TL|TRY)?\s*$/i;
   for (const line of lines) {
-    const m = line.match(rowRe);
-    if (!m) continue;
-    const date = toISODate(m[1]);
-    if (!date) continue;
-    const desc = m[2].trim();
-    const amount = toNumber(m[3]);
-    if (!amount) continue;
-    txs.push({ date, description: desc, amount });
+    const parsed = parsePdfTransactionLine(line);
+    if (parsed) {
+      txs.push(parsed);
+      continue;
+    }
+    const last = txs[txs.length - 1];
+    const clean = line.replace(/\s+/g, " ").trim();
+    if (last && clean && !isIgnorablePdfLine(clean) && !/^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b/.test(clean)) {
+      last.description = `${last.description} ${clean}`.trim();
+    }
   }
   return withPeriod(txs);
 }
