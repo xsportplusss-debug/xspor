@@ -75,6 +75,10 @@ export type BankTx = {
   description: string;
   category?: string;
   amount: number; // + giriş, - çıkış
+  time?: string;       // HH:MM
+  refNo?: string;      // İşlem No / referans
+  operation?: string;  // İşlem Adı (Havale/EFT/Fatura vs.)
+  balance?: number;    // O andaki bakiye
 };
 
 export type CashRegister = {
