@@ -11,6 +11,8 @@ export type ParsedTx = {
   balance?: number;
   refNo?: string;
   currency?: string;
+  time?: string;        // HH:MM
+  operation?: string;   // İşlem Adı
 };
 
 export type ParseResult = {
