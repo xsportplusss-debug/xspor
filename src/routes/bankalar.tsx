@@ -170,17 +170,16 @@ function Page() {
                   <span>Son Ekstre: {b.lastStatementDate || mm.last || "—"}</span>
                   <span>{mm.count} hareket</span>
                 </div>
-                <div className="mt-3 grid grid-cols-5 gap-1">
+                <div className="mt-3 grid grid-cols-2 gap-1 sm:grid-cols-5">
                   <Button size="sm" variant="outline" title="Ekstre Yükle" onClick={() => setUploadBankId(b.id)}>
                     <Upload className="h-4 w-4" />
                   </Button>
-                  <Link to="/bankalar/ekstre-gecmisi" className="contents">
-                    <Button size="sm" variant="outline" className="w-full" title="Ekstre Geçmişi">
-                      <History className="h-4 w-4" />
-                    </Button>
-                  </Link>
+                  <Button size="sm" variant="outline" title="Ekstre Geçmişi"
+                    onClick={() => document.getElementById("ekstre-tablo")?.scrollIntoView({ behavior: "smooth" })}>
+                    <History className="h-4 w-4" />
+                  </Button>
                   <Link to="/bankalar/$id" params={{ id: b.id }} className="contents">
-                    <Button size="sm" variant="outline" className="w-full" title="Hareketleri Görüntüle">
+                    <Button size="sm" variant="outline" className="w-full" title="İşlem Hareketleri">
                       <FileText className="h-4 w-4" />
                     </Button>
                   </Link>
@@ -522,6 +521,10 @@ function UploadStatementDialog({
           description: p.description,
           category: cls.category,
           amount: p.amount,
+          time: p.time,
+          refNo: p.refNo,
+          operation: p.operation,
+          balance: p.balance,
         });
         if (p.amount >= 0) income += p.amount; else expense += -p.amount;
         if (!lastDate || p.date > lastDate) lastDate = p.date;

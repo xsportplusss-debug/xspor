@@ -7,14 +7,24 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
-type Status = "loading" | "auth" | "hydrating" | "unauthorized" | "ready";
+type Status = "loading" | "auth" | "hydrating" | "unauthorized" | "ready" | "error";
 
 const ALLOWED_EMAIL = "xsportplusss@gmail.com";
+const HYDRATE_TIMEOUT_MS = 12_000;
 
 let syncInitialized = false;
 
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("timeout")), ms);
+    p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+  });
+}
+
 export function AuthGate({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
+  const [errMsg, setErrMsg] = useState<string>("");
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -25,19 +35,33 @@ export function AuthGate({ children }: { children: ReactNode }) {
         return;
       }
       setStatus("hydrating");
-      await loadFromCloud(userId);
+      try {
+        await withTimeout(loadFromCloud(userId), HYDRATE_TIMEOUT_MS);
+      } catch (e) {
+        console.warn("cloud hydrate failed, continuing with local cache", e);
+        // Uygulamayı kilitleme — yerel önbellekle devam et.
+      }
       if (!syncInitialized) {
-        initAutoSync();
-        syncInitialized = true;
+        try { initAutoSync(); syncInitialized = true; } catch (e) { console.warn(e); }
       }
       if (!cancelled) setStatus("ready");
     };
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (cancelled) return;
-      if (data.session) handleSession(data.session.user.id, data.session.user.email);
-      else setStatus("auth");
-    });
+    const boot = async () => {
+      try {
+        const { data } = await withTimeout(supabase.auth.getSession(), 8000);
+        if (cancelled) return;
+        if (data.session) await handleSession(data.session.user.id, data.session.user.email);
+        else setStatus("auth");
+      } catch (e) {
+        if (!cancelled) {
+          setErrMsg((e as Error).message || "Bağlantı zaman aşımına uğradı");
+          setStatus("error");
+        }
+      }
+    };
+
+    boot();
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" && session) handleSession(session.user.id, session.user.email);
@@ -51,15 +75,41 @@ export function AuthGate({ children }: { children: ReactNode }) {
       cancelled = true;
       sub.subscription.unsubscribe();
     };
-  }, []);
+  }, [attempt]);
 
   if (status === "loading" || status === "hydrating") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-4">
         <div className="flex items-center gap-3 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin" />
           <span>{status === "hydrating" ? "Verileriniz yükleniyor..." : "Yükleniyor..."}</span>
         </div>
+        <Button variant="outline" size="sm" onClick={() => setStatus("ready")}>
+          Devam Et
+        </Button>
+      </div>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-sm glass">
+          <CardHeader><CardTitle className="text-center text-lg">Bağlantı Hatası</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-center text-sm text-muted-foreground">
+              Veriler yüklenirken bir hata oluştu. {errMsg && <span className="block text-xs">({errMsg})</span>}
+            </p>
+            <div className="flex gap-2">
+              <Button className="flex-1" onClick={() => { setStatus("loading"); setAttempt((a) => a + 1); }}>
+                Tekrar Dene
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => setStatus("ready")}>
+                Çevrimdışı Devam Et
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
