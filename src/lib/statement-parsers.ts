@@ -11,6 +11,8 @@ export type ParsedTx = {
   balance?: number;
   refNo?: string;
   currency?: string;
+  time?: string;        // HH:MM
+  operation?: string;   // İşlem Adı
 };
 
 export type ParseResult = {
@@ -62,6 +64,31 @@ function isIgnorablePdfLine(line: string): boolean {
 
 function parsePdfTransactionLine(line: string): ParsedTx | null {
   const clean = line.replace(/\s+/g, " ").trim();
+
+  // Vakıfbank benzeri: Tarih Saat İşlemNo İşlemAdı Açıklama... Tutar Bakiye
+  const vakif = clean.match(/^(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\s+(\d{1,2}:\d{2}(?::\d{2})?)\s+(\S+)\s+(.+?)\s+(-?[\d.,]+)\s+(-?[\d.,]+)\s*(?:TL|TRY)?$/i);
+  if (vakif) {
+    const date = toISODate(vakif[1]);
+    const amount = toNumber(vakif[5]);
+    if (date && amount) {
+      const descFull = vakif[4].trim();
+      const firstSpace = descFull.indexOf(" ");
+      const operation = firstSpace > 0 ? descFull.slice(0, firstSpace) : descFull;
+      const description = firstSpace > 0 ? descFull.slice(firstSpace + 1) : "";
+      return {
+        date,
+        time: vakif[2].slice(0, 5),
+        refNo: vakif[3],
+        operation,
+        description: description || operation || "İşlem",
+        amount,
+        debit: amount < 0 ? Math.abs(amount) : undefined,
+        credit: amount > 0 ? amount : undefined,
+        balance: toNumber(vakif[6]),
+      };
+    }
+  }
+
   const halkbank = clean.match(/^(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\s+(-?[\d.,]+)\s+(-?[\d.,]+)\s+(.+)$/);
   if (halkbank) {
     const date = toISODate(halkbank[1]);
