@@ -32,7 +32,15 @@ type Form = {
   type: "in" | "out"; amount: number;
 };
 
+type ManualForm = { date: string; amount: string; description: string };
+
 type SortDir = "desc" | "asc";
+
+function parseAmount(s: string): number {
+  const cleaned = s.replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+  const n = Number(cleaned);
+  return isNaN(n) ? NaN : n;
+}
 
 function Page() {
   const { id } = useParams({ from: "/bankalar/$id" });
@@ -48,11 +56,12 @@ function Page() {
 
   const [openNew, setOpenNew] = useState(false);
   const [editing, setEditing] = useState<BankTx | null>(null);
-  const emptyForm = (): Form => ({
-    bankId: id, date: new Date().toISOString().slice(0, 10),
-    description: "", category: "", type: "in", amount: 0,
+  const emptyManual = (): ManualForm => ({
+    date: new Date().toISOString().slice(0, 10),
+    amount: "",
+    description: "",
   });
-  const [form, setForm] = useState<Form>(emptyForm());
+  const [form, setForm] = useState<ManualForm>(emptyManual());
 
   // ---- Filters, sort, pagination ----
   const [search, setSearch] = useState("");
@@ -117,13 +126,18 @@ function Page() {
   }
 
   const save = () => {
-    if (!form.amount) return toast.error("Tutar girin");
+    if (!form.date) return toast.error("Tarih girin");
+    const amt = parseAmount(form.amount);
+    if (!form.amount.trim() || isNaN(amt) || amt === 0) return toast.error("Geçerli bir tutar girin");
+    if (!form.description.trim()) return toast.error("Açıklama girin");
     addBankTx({
-      bankId: form.bankId, date: form.date, description: form.description || "—",
-      category: form.category || undefined,
-      amount: form.type === "in" ? Math.abs(form.amount) : -Math.abs(form.amount),
+      bankId: id,
+      date: form.date,
+      description: form.description.trim(),
+      amount: amt,
+      source: "Manuel",
     });
-    setOpenNew(false); setForm(emptyForm());
+    setOpenNew(false); setForm(emptyManual());
     toast.success("Hareket eklendi");
   };
 
@@ -147,15 +161,38 @@ function Page() {
         actions={
           <>
             <Link to="/bankalar"><Button variant="outline" size="sm"><ArrowLeft className="mr-1 h-4 w-4" /> Geri</Button></Link>
-            <Dialog open={openNew} onOpenChange={(v) => { setOpenNew(v); if (v) setForm(emptyForm()); }}>
+            <Dialog open={openNew} onOpenChange={(v) => { setOpenNew(v); if (v) setForm(emptyManual()); }}>
               <DialogTrigger asChild>
                 <Button size="sm" className="gradient-primary text-primary-foreground shadow-elegant">
-                  <Plus className="mr-1 h-4 w-4" /> Yeni Hareket
+                  <Plus className="mr-1 h-4 w-4" /> Manuel İşlem Ekle
                 </Button>
               </DialogTrigger>
-              <DialogContent>
-                <DialogHeader><DialogTitle>Yeni Hareket</DialogTitle></DialogHeader>
-                <TxForm value={form} onChange={setForm} banks={banks} />
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader><DialogTitle>Manuel İşlem Ekle</DialogTitle></DialogHeader>
+                <div className="grid gap-3">
+                  <div>
+                    <Label>Tarih</Label>
+                    <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Tutar</Label>
+                    <Input
+                      inputMode="decimal"
+                      placeholder="Örn: 5000 veya -1250,50"
+                      value={form.amount}
+                      onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                    />
+                    <p className="mt-1 text-[11px] text-muted-foreground">Negatif değer çıkış, pozitif değer giriş olarak kaydedilir.</p>
+                  </div>
+                  <div>
+                    <Label>Açıklama</Label>
+                    <Input
+                      placeholder="Örn: Kasa para aktarımı"
+                      value={form.description}
+                      onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    />
+                  </div>
+                </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setOpenNew(false)}>İptal</Button>
                   <Button onClick={save} className="gradient-primary text-primary-foreground">Kaydet</Button>
@@ -283,7 +320,7 @@ function Page() {
                     <TableCell className="text-muted-foreground whitespace-nowrap">{t.date}</TableCell>
                     <TableCell className="text-muted-foreground whitespace-nowrap">{t.time || "—"}</TableCell>
                     <TableCell className="font-mono text-xs">{t.refNo || "—"}</TableCell>
-                    <TableCell className="whitespace-nowrap">{t.operation || t.category || "—"}</TableCell>
+                    <TableCell className="whitespace-nowrap">{t.operation || t.category || (t.source === "Manuel" ? <Badge variant="secondary">Manuel</Badge> : "—")}</TableCell>
                     <TableCell className="max-w-[360px] truncate" title={t.description}>{t.description}</TableCell>
                     <TableCell className="text-right font-semibold text-success">
                       {t.amount > 0 ? <span className="inline-flex items-center gap-1"><ArrowDownLeft className="h-3.5 w-3.5" />{fmt(t.amount, bank.currency)}</span> : "—"}

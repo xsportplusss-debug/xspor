@@ -79,6 +79,7 @@ export type BankTx = {
   refNo?: string;      // İşlem No / referans
   operation?: string;  // İşlem Adı (Havale/EFT/Fatura vs.)
   balance?: number;    // O andaki bakiye
+  source?: "Manuel" | "PDF" | "Excel" | "CSV" | "MT940";
 };
 
 export type CashRegister = {
