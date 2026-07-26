@@ -320,7 +320,7 @@ function Page() {
                     <TableCell className="text-muted-foreground whitespace-nowrap">{t.date}</TableCell>
                     <TableCell className="text-muted-foreground whitespace-nowrap">{t.time || "—"}</TableCell>
                     <TableCell className="font-mono text-xs">{t.refNo || "—"}</TableCell>
-                    <TableCell className="whitespace-nowrap">{t.operation || t.category || "—"}</TableCell>
+                    <TableCell className="whitespace-nowrap">{t.operation || t.category || (t.source === "Manuel" ? <Badge variant="secondary">Manuel</Badge> : "—")}</TableCell>
                     <TableCell className="max-w-[360px] truncate" title={t.description}>{t.description}</TableCell>
                     <TableCell className="text-right font-semibold text-success">
                       {t.amount > 0 ? <span className="inline-flex items-center gap-1"><ArrowDownLeft className="h-3.5 w-3.5" />{fmt(t.amount, bank.currency)}</span> : "—"}
