@@ -32,7 +32,15 @@ type Form = {
   type: "in" | "out"; amount: number;
 };
 
+type ManualForm = { date: string; amount: string; description: string };
+
 type SortDir = "desc" | "asc";
+
+function parseAmount(s: string): number {
+  const cleaned = s.replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+  const n = Number(cleaned);
+  return isNaN(n) ? NaN : n;
+}
 
 function Page() {
   const { id } = useParams({ from: "/bankalar/$id" });
@@ -48,11 +56,12 @@ function Page() {
 
   const [openNew, setOpenNew] = useState(false);
   const [editing, setEditing] = useState<BankTx | null>(null);
-  const emptyForm = (): Form => ({
-    bankId: id, date: new Date().toISOString().slice(0, 10),
-    description: "", category: "", type: "in", amount: 0,
+  const emptyManual = (): ManualForm => ({
+    date: new Date().toISOString().slice(0, 10),
+    amount: "",
+    description: "",
   });
-  const [form, setForm] = useState<Form>(emptyForm());
+  const [form, setForm] = useState<ManualForm>(emptyManual());
 
   // ---- Filters, sort, pagination ----
   const [search, setSearch] = useState("");
