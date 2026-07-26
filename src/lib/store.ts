@@ -94,6 +94,7 @@ type Actions = {
   updateBankTx: (id: string, patch: Partial<BankTx>) => void;
   removeBankTx: (id: string) => void;
   bulkRemoveBankTx: (ids: string[]) => void;
+  removeBankTxByStatement: (statementId: string) => void;
   // cash
   addCash: (v: Omit<CashRegister, "id">) => void;
   removeCash: (id: string) => void;
