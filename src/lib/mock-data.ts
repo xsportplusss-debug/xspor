@@ -80,7 +80,10 @@ export type BankTx = {
   operation?: string;  // İşlem Adı (Havale/EFT/Fatura vs.)
   balance?: number;    // O andaki bakiye
   source?: "Manuel" | "PDF" | "Excel" | "CSV" | "MT940";
+  statementId?: string;   // Yüklenen ekstre kaydının id'si
+  statementName?: string; // Ekstrenin dosya adı
 };
+
 
 export type CashRegister = {
   id: string;

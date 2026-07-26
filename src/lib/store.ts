@@ -94,6 +94,7 @@ type Actions = {
   updateBankTx: (id: string, patch: Partial<BankTx>) => void;
   removeBankTx: (id: string) => void;
   bulkRemoveBankTx: (ids: string[]) => void;
+  removeBankTxByStatement: (statementId: string) => void;
   // cash
   addCash: (v: Omit<CashRegister, "id">) => void;
   removeCash: (id: string) => void;
@@ -191,6 +192,7 @@ export const useStore = create<State & Actions>()(
       updateBankTx: (id, patch) => set((s) => ({ bankTx: s.bankTx.map((x) => x.id === id ? { ...x, ...patch } : x) })),
       removeBankTx: (id) => set((s) => ({ bankTx: s.bankTx.filter((x) => x.id !== id) })),
       bulkRemoveBankTx: (ids) => set((s) => ({ bankTx: s.bankTx.filter((x) => !ids.includes(x.id)) })),
+      removeBankTxByStatement: (statementId) => set((s) => ({ bankTx: s.bankTx.filter((x) => x.statementId !== statementId) })),
 
       addCash: (v) => set((s) => ({ cashRegisters: [{ ...v, id: uid() }, ...s.cashRegisters] })),
       removeCash: (id) => set((s) => ({
