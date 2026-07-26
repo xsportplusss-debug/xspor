@@ -126,13 +126,18 @@ function Page() {
   }
 
   const save = () => {
-    if (!form.amount) return toast.error("Tutar girin");
+    if (!form.date) return toast.error("Tarih girin");
+    const amt = parseAmount(form.amount);
+    if (!form.amount.trim() || isNaN(amt) || amt === 0) return toast.error("Geçerli bir tutar girin");
+    if (!form.description.trim()) return toast.error("Açıklama girin");
     addBankTx({
-      bankId: form.bankId, date: form.date, description: form.description || "—",
-      category: form.category || undefined,
-      amount: form.type === "in" ? Math.abs(form.amount) : -Math.abs(form.amount),
+      bankId: id,
+      date: form.date,
+      description: form.description.trim(),
+      amount: amt,
+      source: "Manuel",
     });
-    setOpenNew(false); setForm(emptyForm());
+    setOpenNew(false); setForm(emptyManual());
     toast.success("Hareket eklendi");
   };
 
@@ -156,15 +161,38 @@ function Page() {
         actions={
           <>
             <Link to="/bankalar"><Button variant="outline" size="sm"><ArrowLeft className="mr-1 h-4 w-4" /> Geri</Button></Link>
-            <Dialog open={openNew} onOpenChange={(v) => { setOpenNew(v); if (v) setForm(emptyForm()); }}>
+            <Dialog open={openNew} onOpenChange={(v) => { setOpenNew(v); if (v) setForm(emptyManual()); }}>
               <DialogTrigger asChild>
                 <Button size="sm" className="gradient-primary text-primary-foreground shadow-elegant">
-                  <Plus className="mr-1 h-4 w-4" /> Yeni Hareket
+                  <Plus className="mr-1 h-4 w-4" /> Manuel İşlem Ekle
                 </Button>
               </DialogTrigger>
-              <DialogContent>
-                <DialogHeader><DialogTitle>Yeni Hareket</DialogTitle></DialogHeader>
-                <TxForm value={form} onChange={setForm} banks={banks} />
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader><DialogTitle>Manuel İşlem Ekle</DialogTitle></DialogHeader>
+                <div className="grid gap-3">
+                  <div>
+                    <Label>Tarih</Label>
+                    <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Tutar</Label>
+                    <Input
+                      inputMode="decimal"
+                      placeholder="Örn: 5000 veya -1250,50"
+                      value={form.amount}
+                      onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                    />
+                    <p className="mt-1 text-[11px] text-muted-foreground">Negatif değer çıkış, pozitif değer giriş olarak kaydedilir.</p>
+                  </div>
+                  <div>
+                    <Label>Açıklama</Label>
+                    <Input
+                      placeholder="Örn: Kasa para aktarımı"
+                      value={form.description}
+                      onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    />
+                  </div>
+                </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setOpenNew(false)}>İptal</Button>
                   <Button onClick={save} className="gradient-primary text-primary-foreground">Kaydet</Button>
