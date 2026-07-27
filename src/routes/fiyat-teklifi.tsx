@@ -95,6 +95,20 @@ function Page() {
     { net: 0, vat: 0, total: 0, disc: 0 },
   );
 
+  // KDV oranı bazında kırılım (çıktıda göstermek için)
+  const vatBreakdown = useMemo(() => {
+    const m: Record<number, { net: number; vat: number }> = {};
+    for (const r of rows) {
+      const rate = r.tax || 0;
+      if (!m[rate]) m[rate] = { net: 0, vat: 0 };
+      m[rate].net += r.net;
+      m[rate].vat += r.vat;
+    }
+    return Object.entries(m)
+      .map(([rate, v]) => ({ rate: Number(rate), net: v.net, vat: v.vat }))
+      .sort((a, b) => a.rate - b.rate);
+  }, [rows]);
+
   function updateLine(id: string, patch: Partial<Line>) {
     setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)));
   }
