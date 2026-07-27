@@ -452,6 +452,33 @@ type PreviewRow = ParsedTx & {
   _skip?: boolean;
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+async function ensureBankExistsInCloud(userId: string, bank: NonNullable<ReturnType<typeof useStore.getState>["banks"][number]>) {
+  if (!UUID_RE.test(bank.id)) {
+    throw new Error("Banka kaydı eski formatta. Bankayı silip yeniden ekleyin veya sayfayı yenileyip tekrar deneyin.");
+  }
+
+  const { error } = await supabase.from("banks").upsert(
+    {
+      id: bank.id,
+      user_id: userId,
+      name: bank.name,
+      iban: bank.iban || null,
+      account_no: bank.accountNo || null,
+      account_name: bank.short || bank.name,
+      currency: bank.currency || "TRY",
+      active: bank.active ?? true,
+      current_balance: bankBalance(bank.id),
+      last_statement_date: bank.lastStatementDate || null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "id" },
+  );
+
+  if (error) throw error;
+}
+
 function UploadStatementDialog({
   open, onOpenChange, preselectedBankId, onUploaded,
 }: {
@@ -525,9 +552,22 @@ function UploadStatementDialog({
   const commit = useMutation({
     mutationFn: async () => {
       if (!file || !bankId) throw new Error("Eksik bilgi");
+      if (!selectedBank) throw new Error("Seçilen banka bulunamadı");
       const { data: userData, error: userErr } = await supabase.auth.getUser();
       if (userErr || !userData.user) throw new Error("Oturum bulunamadı");
       const uid = userData.user.id;
+
+      // Compute period
+      const kept = rows.filter((r) => !r._skip);
+      const dates = kept.map((r) => r.date).filter(Boolean).sort();
+      const periodStart = dates[0] || null;
+      const periodEnd = dates[dates.length - 1] || null;
+      const hash = await sha256Hex(file).catch(() => null);
+
+      // The statement row has a foreign-key to public.banks.id. Because banks are
+      // created in the local app store first, make sure the matching cloud row
+      // exists before inserting bank_statements.
+      await ensureBankExistsInCloud(uid, selectedBank);
 
       // Upload file to storage
       const safe = file.name.replace(/[^\w.\-]+/g, "_");
@@ -536,13 +576,6 @@ function UploadStatementDialog({
         .from("bank-statements")
         .upload(path, file, { contentType: file.type || undefined, upsert: false });
       if (upErr) throw upErr;
-
-      // Compute period
-      const kept = rows.filter((r) => !r._skip);
-      const dates = kept.map((r) => r.date).filter(Boolean).sort();
-      const periodStart = dates[0] || null;
-      const periodEnd = dates[dates.length - 1] || null;
-      const hash = await sha256Hex(file).catch(() => null);
 
       // Insert statement row
       const { data: stmt, error: sErr } = await supabase.from("bank_statements").insert({
@@ -586,6 +619,16 @@ function UploadStatementDialog({
         };
       });
       bulkAddBankTx(toAdd);
+
+      const finalBalance = bankBalance(bankId);
+      await supabase
+        .from("banks")
+        .update({
+          current_balance: finalBalance,
+          last_statement_date: periodEnd,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", bankId);
 
       return { imported: toAdd.length, skipped: rows.length - toAdd.length };
     },
