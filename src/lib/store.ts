@@ -250,7 +250,26 @@ export const useStore = create<State & Actions>()(
       resetAll: () => set(() => ({ ...initial })),
 
     }),
-    { name: "fintra:v1" },
+    {
+      name: "fintra:v1",
+      version: 2,
+      migrate: (persisted: unknown, _version) => {
+        const s = (persisted ?? {}) as Partial<State>;
+        const banks = Array.isArray(s.banks) ? s.banks : [];
+        const bankTx = Array.isArray(s.bankTx) ? s.bankTx : [];
+        const idMap: Record<string, string> = {};
+        const fixedBanks = banks.map((b) => {
+          if (b?.id && UUID_RE.test(b.id)) return b;
+          const newId = uuid();
+          if (b?.id) idMap[b.id] = newId;
+          return { ...b, id: newId };
+        });
+        const fixedTx = bankTx.map((t) =>
+          t && idMap[t.bankId] ? { ...t, bankId: idMap[t.bankId] } : t,
+        );
+        return { ...s, banks: fixedBanks, bankTx: fixedTx };
+      },
+    },
   ),
 );
 
