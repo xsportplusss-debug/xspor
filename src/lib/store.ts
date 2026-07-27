@@ -194,7 +194,7 @@ export const useStore = create<State & Actions>()(
       removeCategory: (id) => set((s) => ({ categories: s.categories.filter((x) => x.id !== id) })),
       bulkRemoveCategories: (ids) => set((s) => ({ categories: s.categories.filter((x) => !ids.includes(x.id)) })),
 
-      addBank: (v) => set((s) => ({ banks: [{ ...v, id: uid() }, ...s.banks] })),
+      addBank: (v) => set((s) => ({ banks: [{ ...v, id: uuid() }, ...s.banks] })),
       removeBank: (id) => set((s) => ({
         banks: s.banks.filter((x) => x.id !== id),
         bankTx: s.bankTx.filter((x) => x.bankId !== id),
