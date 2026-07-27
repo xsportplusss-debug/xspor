@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
@@ -94,6 +94,20 @@ function Page() {
     (a, r) => ({ net: a.net + r.net, vat: a.vat + r.vat, total: a.total + r.total, disc: a.disc + r.disc }),
     { net: 0, vat: 0, total: 0, disc: 0 },
   );
+
+  // KDV oranı bazında kırılım (çıktıda göstermek için)
+  const vatBreakdown = useMemo(() => {
+    const m: Record<number, { net: number; vat: number }> = {};
+    for (const r of rows) {
+      const rate = r.tax || 0;
+      if (!m[rate]) m[rate] = { net: 0, vat: 0 };
+      m[rate].net += r.net;
+      m[rate].vat += r.vat;
+    }
+    return Object.entries(m)
+      .map(([rate, v]) => ({ rate: Number(rate), net: v.net, vat: v.vat }))
+      .sort((a, b) => a.rate - b.rate);
+  }, [rows]);
 
   function updateLine(id: string, patch: Partial<Line>) {
     setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)));
@@ -338,37 +352,44 @@ function Page() {
                     </TableRow>
                   ))}
                 </TableBody>
-                <TableFooter>
-                  <TableRow className="bg-muted/40">
-                    <TableCell colSpan={6} className="text-right font-medium print:hidden">Ara Toplam (KDV Hariç)</TableCell>
-                    <TableCell colSpan={5} className="hidden text-right font-medium print:table-cell">Ara Toplam (KDV Hariç)</TableCell>
-                    <TableCell className="text-right">{fmtTL(sums.net)}</TableCell>
-                    <TableCell colSpan={2} className="print:hidden"></TableCell>
-                  </TableRow>
-                  {globalDiscount > 0 && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-right text-muted-foreground print:hidden">İskonto (%{globalDiscount})</TableCell>
-                      <TableCell colSpan={5} className="hidden text-right text-muted-foreground print:table-cell">İskonto (%{globalDiscount})</TableCell>
-                      <TableCell className="text-right text-muted-foreground">-{fmtTL(sums.disc)}</TableCell>
-                      <TableCell colSpan={2} className="print:hidden"></TableCell>
-                    </TableRow>
-                  )}
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-right font-medium print:hidden">KDV Toplamı</TableCell>
-                    <TableCell colSpan={5} className="hidden text-right font-medium print:table-cell">KDV Toplamı</TableCell>
-                    <TableCell className="text-right">{fmtTL(sums.vat)}</TableCell>
-                    <TableCell colSpan={2} className="print:hidden"></TableCell>
-                  </TableRow>
-                  <TableRow className="bg-primary/10">
-                    <TableCell colSpan={6} className="text-right text-base font-bold print:hidden">GENEL TOPLAM</TableCell>
-                    <TableCell colSpan={5} className="hidden text-right text-base font-bold print:table-cell">GENEL TOPLAM</TableCell>
-                    <TableCell className="text-right text-base font-bold text-primary">{fmtTL(sums.total)}</TableCell>
-                    <TableCell colSpan={2} className="print:hidden"></TableCell>
-                  </TableRow>
-                </TableFooter>
               </Table>
             )}
           </div>
+
+          {/* Toplamlar — ekran + çıktı */}
+          {rows.length > 0 && (
+            <div className="mt-6 flex justify-end">
+              <div className="w-full max-w-sm rounded-lg border bg-muted/20 p-4 text-sm print:border print:bg-transparent print:p-3">
+                <div className="flex justify-between py-1">
+                  <span className="text-muted-foreground">Ara Toplam (KDV Hariç)</span>
+                  <span className="font-medium">{fmtTL(sums.net + sums.disc)}</span>
+                </div>
+                {globalDiscount > 0 && (
+                  <>
+                    <div className="flex justify-between py-1 text-muted-foreground">
+                      <span>İskonto (%{globalDiscount})</span>
+                      <span>-{fmtTL(sums.disc)}</span>
+                    </div>
+                    <div className="flex justify-between py-1">
+                      <span className="text-muted-foreground">İskontolu Toplam (KDV Hariç)</span>
+                      <span className="font-medium">{fmtTL(sums.net)}</span>
+                    </div>
+                  </>
+                )}
+                {vatBreakdown.map((v) => (
+                  <div key={v.rate} className="flex justify-between py-1">
+                    <span className="text-muted-foreground">KDV (%{v.rate})</span>
+                    <span className="font-medium">{fmtTL(v.vat)}</span>
+                  </div>
+                ))}
+                <div className="my-2 border-t" />
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold">Genel Toplam (KDV Dahil)</span>
+                  <span className="text-lg font-bold text-primary">{fmtTL(sums.total)}</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="mt-8 flex justify-between border-t pt-4 text-xs text-muted-foreground">
             <span>Teklifi Hazırlayan: {company.owner || company.name}</span>

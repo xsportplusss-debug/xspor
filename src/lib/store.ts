@@ -3,6 +3,18 @@ import { persist } from "zustand/middleware";
 import type { Invoice, Cari, Product, Bank, BankTx, CashRegister, CashTx, Category } from "./mock-data";
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+// UUID v4 – required for records synced to Supabase columns typed as uuid (e.g. banks.bank_id)
+const uuid = () => {
+  const g = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+  if (g?.randomUUID) return g.randomUUID();
+  // Fallback (RFC4122 v4)
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type EInvoiceConfig = {
   apiUrl: string;
@@ -182,7 +194,7 @@ export const useStore = create<State & Actions>()(
       removeCategory: (id) => set((s) => ({ categories: s.categories.filter((x) => x.id !== id) })),
       bulkRemoveCategories: (ids) => set((s) => ({ categories: s.categories.filter((x) => !ids.includes(x.id)) })),
 
-      addBank: (v) => set((s) => ({ banks: [{ ...v, id: uid() }, ...s.banks] })),
+      addBank: (v) => set((s) => ({ banks: [{ ...v, id: uuid() }, ...s.banks] })),
       removeBank: (id) => set((s) => ({
         banks: s.banks.filter((x) => x.id !== id),
         bankTx: s.bankTx.filter((x) => x.bankId !== id),
@@ -238,7 +250,26 @@ export const useStore = create<State & Actions>()(
       resetAll: () => set(() => ({ ...initial })),
 
     }),
-    { name: "fintra:v1" },
+    {
+      name: "fintra:v1",
+      version: 2,
+      migrate: (persisted: unknown, _version) => {
+        const s = (persisted ?? {}) as Partial<State>;
+        const banks = Array.isArray(s.banks) ? s.banks : [];
+        const bankTx = Array.isArray(s.bankTx) ? s.bankTx : [];
+        const idMap: Record<string, string> = {};
+        const fixedBanks = banks.map((b) => {
+          if (b?.id && UUID_RE.test(b.id)) return b;
+          const newId = uuid();
+          if (b?.id) idMap[b.id] = newId;
+          return { ...b, id: newId };
+        });
+        const fixedTx = bankTx.map((t) =>
+          t && idMap[t.bankId] ? { ...t, bankId: idMap[t.bankId] } : t,
+        );
+        return { ...s, banks: fixedBanks, bankTx: fixedTx };
+      },
+    },
   ),
 );
 
