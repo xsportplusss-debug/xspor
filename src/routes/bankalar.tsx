@@ -328,6 +328,8 @@ function StatementsSection({ onUploadClick }: { onUploadClick: () => void }) {
   const deleteMut = useMutation({
     mutationFn: async (row: BankStatementRow) => {
       await supabase.storage.from("bank-statements").remove([row.file_path]);
+      // Remove tx rows persisted for this statement (best-effort).
+      await supabase.from("bank_transactions").delete().eq("statement_id", row.id);
       const { error } = await supabase.from("bank_statements").delete().eq("id", row.id);
       if (error) throw error;
       removeBankTxByStatement(row.id);
@@ -335,6 +337,7 @@ function StatementsSection({ onUploadClick }: { onUploadClick: () => void }) {
     onSuccess: () => {
       toast.success("Ekstre ve içindeki hareketler silindi");
       qc.invalidateQueries({ queryKey: ["bank-statements"] });
+      qc.invalidateQueries({ queryKey: ["bank-tx"] });
     },
     onError: (e: unknown) => toast.error(`Silinemedi: ${(e as Error).message}`),
     onSettled: () => setDeleteTarget(null),
