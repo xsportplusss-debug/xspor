@@ -15,12 +15,14 @@ import {
   ArrowLeft, ArrowDownLeft, ArrowUpRight, Pencil, Plus, Trash2,
   ChevronLeft, ChevronRight, Search, ArrowUpDown, ChevronDown,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { fmt, type BankTx } from "@/lib/mock-data";
 import { useStore, bankBalance } from "@/lib/store";
 import { useSelection } from "@/hooks/use-selection";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/bankalar/$id")({
   head: () => ({ meta: [{ title: "İşlem Hareketleri — Fintra" }] }),
@@ -42,17 +44,101 @@ function parseAmount(s: string): number {
   return isNaN(n) ? NaN : n;
 }
 
+type DbBankTx = {
+  id: string;
+  bank_id: string;
+  statement_id: string | null;
+  date: string;
+  description: string;
+  ref_no: string | null;
+  debit: number | string;
+  credit: number | string;
+  balance: number | string | null;
+  category: string | null;
+  source: string | null;
+};
+
+type DbBank = {
+  id: string;
+  name: string;
+  iban: string | null;
+  account_no: string | null;
+  currency: string | null;
+};
+
 function Page() {
   const { id } = useParams({ from: "/bankalar/$id" });
   const isMobile = useIsMobile();
+  const qc = useQueryClient();
 
   const banks = useStore((s) => s.banks);
-  const bank = banks.find((b) => b.id === id);
-  const tx = useStore((s) => s.bankTx.filter((t) => t.bankId === id));
+  const localBank = banks.find((b) => b.id === id);
+  const storeTx = useStore((s) => s.bankTx.filter((t) => t.bankId === id));
   const addBankTx = useStore((s) => s.addBankTx);
   const updateBankTx = useStore((s) => s.updateBankTx);
   const removeBankTx = useStore((s) => s.removeBankTx);
   const bulkRemoveBankTx = useStore((s) => s.bulkRemoveBankTx);
+
+  // Fallback bank fetch (in case local store hasn't hydrated yet on this device).
+  const { data: remoteBank } = useQuery({
+    queryKey: ["bank-detail", id],
+    queryFn: async (): Promise<DbBank | null> => {
+      const { data, error } = await supabase
+        .from("banks")
+        .select("id, name, iban, account_no, currency")
+        .eq("id", id)
+        .maybeSingle();
+      if (error) throw error;
+      return data as DbBank | null;
+    },
+    enabled: !localBank,
+  });
+
+  const bank = localBank ?? (remoteBank
+    ? { id: remoteBank.id, name: remoteBank.name, short: remoteBank.name.slice(0, 4), iban: remoteBank.iban || "", accountNo: remoteBank.account_no || undefined, currency: remoteBank.currency || "TRY", balance: 0, color: "#0055A4" }
+    : undefined);
+
+  // Authoritative per-bank transactions from Supabase (all statements combined).
+  const { data: dbTx = [] } = useQuery({
+    queryKey: ["bank-tx", id],
+    queryFn: async (): Promise<DbBankTx[]> => {
+      const { data, error } = await supabase
+        .from("bank_transactions")
+        .select("id, bank_id, statement_id, date, description, ref_no, debit, credit, balance, category, source")
+        .eq("bank_id", id)
+        .order("date", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as DbBankTx[];
+    },
+  });
+
+  // Merge: keep local store tx as the primary display (it drives balance/analytics
+  // across the app), and surface any DB rows that aren't represented locally so
+  // the button reliably shows every uploaded statement's transactions.
+  const tx: BankTx[] = useMemo(() => {
+    const keyOf = (d: string, amt: number, desc: string) =>
+      `${d}|${amt.toFixed(2)}|${(desc || "").slice(0, 80).toLowerCase()}`;
+    const localKeys = new Set(storeTx.map((t) => keyOf(t.date, t.amount, t.description)));
+    const extras: BankTx[] = [];
+    for (const r of dbTx) {
+      const amount = Number(r.credit || 0) - Number(r.debit || 0);
+      const k = keyOf(r.date, amount, r.description || "");
+      if (localKeys.has(k)) continue;
+      extras.push({
+        id: `db:${r.id}`,
+        bankId: r.bank_id,
+        date: r.date,
+        description: r.description || "",
+        amount,
+        category: r.category || undefined,
+        refNo: r.ref_no || undefined,
+        balance: r.balance == null ? undefined : Number(r.balance),
+        source: (r.source as BankTx["source"]) || "PDF",
+        statementId: r.statement_id || undefined,
+      });
+    }
+    return [...storeTx, ...extras];
+  }, [storeTx, dbTx]);
 
   const [openNew, setOpenNew] = useState(false);
   const [editing, setEditing] = useState<BankTx | null>(null);
@@ -62,6 +148,31 @@ function Page() {
     description: "",
   });
   const [form, setForm] = useState<ManualForm>(emptyManual());
+
+  // Auto-hydrate store from DB rows if store is empty for this bank (covers a
+  // fresh device where user_data hasn't restored bankTx yet).
+  useEffect(() => {
+    if (storeTx.length === 0 && dbTx.length > 0) {
+      const toAdd = dbTx.map<Omit<BankTx, "id">>((r) => {
+        const amount = Number(r.credit || 0) - Number(r.debit || 0);
+        return {
+          bankId: r.bank_id,
+          date: r.date,
+          description: r.description || "",
+          amount,
+          category: r.category || undefined,
+          refNo: r.ref_no || undefined,
+          balance: r.balance == null ? undefined : Number(r.balance),
+          source: (r.source as BankTx["source"]) || "PDF",
+          statementId: r.statement_id || undefined,
+        };
+      });
+      // Insert via store action so cloud-sync also picks them up.
+      useStore.getState().bulkAddBankTx(toAdd);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dbTx.length]);
+
 
   // ---- Filters, sort, pagination ----
   const [search, setSearch] = useState("");
