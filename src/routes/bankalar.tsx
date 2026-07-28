@@ -252,7 +252,7 @@ function Page() {
         open={uploadOpen}
         onOpenChange={(v) => { setUploadOpen(v); if (!v) setUploadBankId(null); }}
         preselectedBankId={uploadBankId}
-        onUploaded={() => qc.invalidateQueries({ queryKey: ["bank-statements"] })}
+        onUploaded={() => { qc.invalidateQueries({ queryKey: ["bank-statements"] }); qc.invalidateQueries({ queryKey: ["bank-tx"] }); }}
       />
     </div>
   );
