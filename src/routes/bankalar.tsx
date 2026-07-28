@@ -620,6 +620,35 @@ function UploadStatementDialog({
       });
       bulkAddBankTx(toAdd);
 
+      // Persist to bank_transactions so any device can list them by bank_id,
+      // independent of the local store / user_data JSON blob.
+      if (toAdd.length) {
+        const dbRows = toAdd.map((t) => {
+          const cls = classify(t.description, t.amount);
+          return {
+            user_id: uid,
+            bank_id: bankId,
+            statement_id: statementId,
+            date: t.date,
+            description: t.description,
+            ref_no: t.refNo ?? null,
+            debit: t.amount < 0 ? -t.amount : 0,
+            credit: t.amount > 0 ? t.amount : 0,
+            balance: t.balance ?? null,
+            currency: selectedBank.currency || "TRY",
+            source: "PDF",
+            category: cls.category,
+            direction: t.amount >= 0 ? "in" : "out",
+          };
+        });
+        // Chunk to avoid oversized inserts
+        for (let i = 0; i < dbRows.length; i += 500) {
+          const chunk = dbRows.slice(i, i + 500);
+          const { error: txErr } = await supabase.from("bank_transactions").insert(chunk);
+          if (txErr) console.warn("bank_transactions insert failed", txErr);
+        }
+      }
+
       const finalBalance = bankBalance(bankId);
       await supabase
         .from("banks")
