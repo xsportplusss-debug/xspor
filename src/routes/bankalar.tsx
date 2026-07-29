@@ -31,6 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { parseStatement, sha256Hex, type ParsedTx } from "@/lib/statement-parsers";
+import { validateStatementForBank } from "@/lib/bank-identity";
 import { classify } from "@/lib/tx-classifier";
 
 export const Route = createFileRoute("/bankalar")({
