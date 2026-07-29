@@ -516,13 +516,21 @@ function UploadStatementDialog({
   const selectedBank = banks.find((b) => b.id === bankId);
 
   const analyze = async () => {
-    if (!file) return toast.error("PDF dosyası seçin");
+    if (!file) return toast.error("Dosya seçin");
     if (!bankId) return toast.error("Banka seçin");
+    if (!selectedBank) return toast.error("Banka bulunamadı");
     setParsing(true);
     try {
+      // Çift doğrulama: dosya adı + içerik
+      const v = await validateStatementForBank(file, selectedBank.name);
+      if (!v.ok) {
+        toast.error(v.message);
+        setParsing(false);
+        return;
+      }
       const res = await parseStatement(file);
       if (!res.transactions.length) {
-        toast.error("PDF'den hareket okunamadı. Farklı bir dosya deneyin veya manuel giriş yapın.");
+        toast.error("Dosyadan hareket okunamadı. Farklı bir dosya deneyin veya manuel giriş yapın.");
         setParsing(false);
         return;
       }
