@@ -1,89 +1,72 @@
-# Bankalar Modülü — Uygulama Planı
 
-Mevcut çalışan özellikler korunacak. Sadece Bankalar akışı ve ilişkili muhasebe entegrasyonu genişletilecek. Erişim yalnızca **xsportplusss@gmail.com** hesabıyla sınırlı kalacak (mevcut AuthGate zaten bu kısıtı uyguluyor — server tarafında da doğrulama eklenecek).
+# Banka Dosya Doğrulama Sistemi (PDF + XLSX + CSV + MT940)
 
-## 1. Veritabanı (Lovable Cloud)
+Bankalar modülüne, yanlış bankaya ait ekstre yüklenmesini engelleyen çift doğrulama katmanı ekleyeceğim. Parser, kaydetme akışı ve UI korunacak; sadece yükleme öncesi doğrulama katmanı devreye girecek.
 
-Yeni/yenilenen tablolar (hepsi RLS + `user_id = auth.uid()` politikası ile):
+## 1. Yeni modül: `src/lib/bank-identity.ts`
 
-- `banks` — banka_adi, iban, hesap_no, para_birimi, aktif, guncel_bakiye, son_ekstre_tarihi
-- `bank_accounts` — çoklu hesap desteği (bank_id, hesap_adi, iban, hesap_no, bakiye)
-- `bank_statements` (mevcut, genişletilecek) — bank_account_id, donem_baslangic, donem_bitis, dosya_hash (duplicate önleme), islem_sayisi, durum
-- `statement_files` — orijinal dosya referansı (storage path, mime, size, uploaded_by)
-- `statement_transactions` — statement_id, tarih, aciklama, tutar, borc, alacak, bakiye, referans_no, kategori, matched_invoice_id, matched_customer_id
-- `accounting_entries` — transaction_id, tip (gelir/gider/tahsilat/ödeme/komisyon/vergi), kategori, tutar, tarih
-- `customers` (yoksa) — ad, vkn/tckn, bakiye
-- `invoices` (yoksa) — fatura_no, musteri_id, tutar, durum, tarih
+Modüler banka kaydı:
 
-Storage: mevcut `bank-statements` bucket'ı kullanılacak; RLS `{user_id}/` klasör kuralı.
+```ts
+type BankIdentity = {
+  id: string;
+  displayName: string;
+  aliases: string[]; // normalize edilmiş formda karşılaştırılır
+};
+```
 
-## 2. Bankalar Sayfası (`/bankalar`)
+Başlangıçta tanımlı bankalar ve alias'ları:
 
-Banka kartları grid:
-- Banka Adı · IBAN · Hesap No · Güncel Bakiye · Son Ekstre Tarihi
-- Aksiyonlar: **Ekstre Yükle · Ekstre Geçmişi · İndir · Sil · Yenile**
-- Üstte "Yeni Banka Ekle" ve genel özet (toplam bakiye).
+- **VakıfBank** — vakifbank, vakif bank, t vakiflar bankasi, tvb
+- **Halkbank** — halkbank, halk bankasi, turkiye halk bankasi, t halk bankasi
+- **Ziraat Bankası** — ziraat, ziraat bankasi, t c ziraat bankasi, tc ziraat
+- **Garanti BBVA** — garanti, garanti bbva, garanti bankasi, tgb
+- **İş Bankası** — is bankasi, isbank, turkiye is bankasi, t is bankasi
+- **Akbank** — akbank, akbank tas
+- **Kuveyt Türk** — kuveyt turk, kuveytturk, kuveyt turk katilim
+- **DenizBank** — denizbank, deniz bank
+- **ING** — ing, ing bank, ing bank as
+- **QNB** — qnb, qnb finansbank, finansbank
+- **TEB** — teb, turk ekonomi bankasi, t ekonomi bankasi
 
-## 3. Ekstre Yükleme
+Yardımcılar:
+- `normalize(text)` — küçük harf, Türkçe karakter sadeleştirme (ı→i, ş→s, ç→c, ğ→g, ü→u, ö→o), noktalama/alt çizgi/tire/. karakterlerini boşluğa, çoklu boşluğu tek boşluğa indir.
+- `matchesBank(text, bank)` — normalize edilmiş metinde bankanın alias'larından biri kelime sınırıyla geçiyor mu.
+- `detectBanks(text)` — metinde tespit edilen tüm bankaları döner (yanlış eşleşmeyi kullanıcıya ipucu olarak göstermek için).
 
-Kabul edilen formatlar: **PDF, XLSX, CSV, MT940**.
+## 2. Doğrulama akışı — tüm formatlar için
 
-Sunucu tarafı server function (`createServerFn` + `requireSupabaseAuth`):
-1. Dosyayı Storage'a yükle (`{user_id}/{bank_id}/{timestamp}-{filename}`).
-2. SHA-256 hash hesapla → duplicate kontrolü.
-3. Format tespiti → parser çalıştır:
-   - CSV/XLSX: başlık eşleme (Tarih, Açıklama, Borç, Alacak, Bakiye, Ref).
-   - PDF: `pdfjs-dist` ile text extract + regex satır ayrıştırma.
-   - MT940: `:61:` ve `:86:` bloklarını parse eden yerel parser.
-4. `bank_statements` + `statement_files` + `statement_transactions` kayıtları oluştur.
-5. Her transaction için otomatik kategorizasyon (anahtar kelime tabanlı):
-   - Trendyol/Hepsiburada/Amazon/N11/Pazarama → Satış Geliri
-   - Kargo → Kargo Gideri · Komisyon → Banka Komisyonu · POS → POS Kesintisi
-   - Vergi/SGK/Maaş/Kira/Elektrik → ilgili gider kategorisi
-6. `accounting_entries` üret, banka bakiyesini güncelle.
-7. Fatura eşleştirme: tutar + tarih + referans → varsa `invoices.durum = 'Ödendi'`.
-8. Cari eşleşmesi: açıklama içinde müşteri adı → `customers.bakiye` güncelle.
+`src/routes/bankalar.tsx` içindeki `UploadStatementDialog`'ta, kullanıcı dosya seçip "Analiz Et" dediğinde iki aşama çalışır:
 
-Yükleme sonu özet modal: **Toplam İşlem · Gelir · Gider · Tahsilat · Ödeme · Komisyon · Bekleyen Eşleştirme · Hatalı Kayıt**.
+**A. Dosya adı kontrolü (tüm formatlar: PDF/XLSX/CSV/MT940)**
+`matchesBank(fileName, selectedBank)` başarısızsa:
+> "Seçtiğiniz dosya adı {BankaAdı}'a ait görünmüyor. Lütfen doğru bankaya ait ekstreyi seçiniz."
+(Metinde farklı banka tespit edilirse: "(Tespit edilen: Halkbank)" ipucu eklenir.)
 
-## 4. Ekstre Geçmişi Sayfası (`/bankalar/ekstre-gecmisi`)
+**B. İçerik kontrolü (dosya türüne göre)**
+- **PDF**: mevcut `parsePDF` altyapısıyla ilk 2 sayfanın metni çıkarılır (`extractPdfHeadText`).
+- **XLSX**: ilk sayfanın ilk ~30 satırı `sheet_to_json({header:1})` ile okunup birleştirilir. Ekstre başlıkları (banka adı/logo alanı) genelde en üstte olur.
+- **CSV**: dosyanın ilk ~4 KB'ı text olarak okunur.
+- **MT940 / .sta / .txt**: dosyanın ilk ~4 KB'ı okunur; MT940 blok içeriğinde banka adı veya BIC (`TVBATR2A` VakıfBank, `TRHBTR2A` Halkbank, vb.) aranır. BIC eşlemesi alias listesine eklenir.
 
-Tablo sütunları: Dosya Adı · Banka · Dönem · Yükleme Tarihi · İşlem Sayısı · Durum · Görüntüle · İndir · Sil
+Birleştirilen metinde `matchesBank(content, selectedBank)` başarısızsa:
+> "Dosya içeriği seçilen bankaya ait değildir."
 
-- **Görüntüle**: transaction listesi drawer/dialog (kategori, eşleşme durumu, manuel düzeltme).
-- **Sil**: sadece dosyayı ve statement kaydını siler; `accounting_entries` ve `statement_transactions` korunur (onay diyaloğu).
+Her iki kontrol geçerse mevcut parse + önizleme + "Onayla ve Kaydet" akışı aynen çalışır. Aksi halde hiçbir kayıt oluşturulmaz.
 
-## 5. Diğer Modüllere Entegrasyon
+## 3. Bilinmeyen banka davranışı
 
-Import sonrası otomatik güncellenir:
-- **Cari Hesaplar** — müşteri bakiyeleri
-- **Gelir / Gider** — muhasebe kayıtları
-- **Kasa** — nakit hareketleri (varsa)
-- **Banka Bakiyesi** — son bakiye
-- **Finans Özeti / Nakit Akışı** — dashboard kartları
+Kullanıcının eklediği banka adı hiçbir `BankIdentity` ile eşleşmiyorsa (özel/bilinmeyen banka): doğrulama atlanır, mevcut davranış korunur. Katı doğrulama yalnızca bilinen bankalar için uygulanır — bu, yeni banka eklemeyi engellemez.
 
-## 6. Yetkilendirme
+## 4. Hata yönetimi
 
-- Client: mevcut `AuthGate` `xsportplusss@gmail.com` dışındaki kullanıcıları engelliyor — korunacak.
-- Server: her `createServerFn` `requireSupabaseAuth` middleware'i + email whitelist kontrolü (403 aksi halde).
-- RLS: tüm tablolarda `user_id = auth.uid()`.
+- Şifreli/bozuk/okunamayan PDF veya XLSX: try/catch ile yakalanır, "Dosya okunamadı: bozuk, şifreli veya desteklenmeyen format olabilir." toast'u; dialog açık kalır, kayıt yapılmaz.
+- İçerik boş (ör. taranmış PDF): "Dosya içeriği okunamadı, tarayıcı çıktısı olabilir. Doğrulama yapılamadığından yükleme iptal edildi."
 
-## 7. Teknik Notlar
+## 5. Dokunulmayacaklar
 
-- React Query ile cache; mutations → `invalidateQueries`.
-- Parser modülleri `src/lib/statement-parsers/` altında (csv.ts, xlsx.ts, pdf.ts, mt940.ts).
-- Kategorizasyon kuralları `src/lib/tx-classifier.ts`.
-- UI mevcut tema tokenlarını kullanır (glass, shadow-elegant); mobil-first responsive grid.
+- Mevcut parser mantığı (`src/lib/statement-parsers.ts`) — sadece küçük bir `extractHeadText` yardımcısı eklenecek.
+- Kaydetme akışı, UUID/foreign key düzeltmeleri, işlem hareketleri ekranı, kategorizasyon.
+- Diğer modüller.
 
-## Uygulama Sırası
-
-1. DB migration (yeni tablolar + RLS + GRANT).
-2. Server functions (upload, list, parse, delete, classify, match).
-3. Parser + classifier modülleri.
-4. Bankalar sayfası UI yenileme (kartlar + aksiyonlar).
-5. Ekstre Geçmişi sayfası.
-6. Import özet modal + toast.
-7. Cari / Gelir-Gider / Dashboard entegrasyonları.
-8. E2E test: bir CSV yükle, kategorileri ve bakiyeyi doğrula.
-
-Onaylarsanız migration'dan başlayacağım.
+Onaylarsanız uygulamaya geçerim.
