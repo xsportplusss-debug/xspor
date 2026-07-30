@@ -150,7 +150,7 @@ function Page() {
         <EmptyState
           icon={Landmark}
           title="Henüz banka yok"
-          description="Ekstre yüklemek için önce bir banka hesabı ekleyin."
+          desc="Ekstre yüklemek için önce bir banka hesabı ekleyin."
           action={<Button onClick={() => setOpenBank(true)}><Plus className="mr-2 h-4 w-4" /> Yeni Banka</Button>}
         />
       ) : (
