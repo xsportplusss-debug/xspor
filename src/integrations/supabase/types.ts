@@ -105,11 +105,14 @@ export type Database = {
           file_path: string
           file_size: number
           id: string
+          imported_by: string | null
           mime_type: string | null
           period_end: string | null
           period_start: string | null
           status: string
           summary: Json | null
+          total_credit: number
+          total_debit: number
           tx_count: number
           updated_at: string
           user_id: string
@@ -124,11 +127,14 @@ export type Database = {
           file_path: string
           file_size?: number
           id?: string
+          imported_by?: string | null
           mime_type?: string | null
           period_end?: string | null
           period_start?: string | null
           status?: string
           summary?: Json | null
+          total_credit?: number
+          total_debit?: number
           tx_count?: number
           updated_at?: string
           user_id: string
@@ -143,11 +149,14 @@ export type Database = {
           file_path?: string
           file_size?: number
           id?: string
+          imported_by?: string | null
           mime_type?: string | null
           period_end?: string | null
           period_start?: string | null
           status?: string
           summary?: Json | null
+          total_credit?: number
+          total_debit?: number
           tx_count?: number
           updated_at?: string
           user_id?: string
@@ -166,62 +175,101 @@ export type Database = {
         Row: {
           balance: number | null
           bank_id: string
+          branch: string | null
           category: string | null
+          counterparty: string | null
+          counterparty_iban: string | null
           created_at: string
           credit: number
           currency: string | null
           date: string
           debit: number
+          dedup_key: string | null
           description: string
           direction: string | null
+          doc_no: string | null
+          file_name: string | null
           id: string
           import_id: string | null
+          imported_at: string
           matched_customer_id: string | null
           matched_invoice_id: string | null
+          note: string | null
+          operation: string | null
+          raw: Json | null
           ref_no: string | null
           source: string
           statement_id: string | null
+          tx_time: string | null
+          user_description: string | null
           user_id: string
+          value_date: string | null
         }
         Insert: {
           balance?: number | null
           bank_id: string
+          branch?: string | null
           category?: string | null
+          counterparty?: string | null
+          counterparty_iban?: string | null
           created_at?: string
           credit?: number
           currency?: string | null
           date: string
           debit?: number
+          dedup_key?: string | null
           description?: string
           direction?: string | null
+          doc_no?: string | null
+          file_name?: string | null
           id?: string
           import_id?: string | null
+          imported_at?: string
           matched_customer_id?: string | null
           matched_invoice_id?: string | null
+          note?: string | null
+          operation?: string | null
+          raw?: Json | null
           ref_no?: string | null
           source?: string
           statement_id?: string | null
+          tx_time?: string | null
+          user_description?: string | null
           user_id: string
+          value_date?: string | null
         }
         Update: {
           balance?: number | null
           bank_id?: string
+          branch?: string | null
           category?: string | null
+          counterparty?: string | null
+          counterparty_iban?: string | null
           created_at?: string
           credit?: number
           currency?: string | null
           date?: string
           debit?: number
+          dedup_key?: string | null
           description?: string
           direction?: string | null
+          doc_no?: string | null
+          file_name?: string | null
           id?: string
           import_id?: string | null
+          imported_at?: string
           matched_customer_id?: string | null
           matched_invoice_id?: string | null
+          note?: string | null
+          operation?: string | null
+          raw?: Json | null
           ref_no?: string | null
           source?: string
           statement_id?: string | null
+          tx_time?: string | null
+          user_description?: string | null
           user_id?: string
+          value_date?: string | null
         }
         Relationships: [
           {
