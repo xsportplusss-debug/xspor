@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { StatementParseResult } from "@/lib/bank-parsers";
 import { dedupKey, type RawTx } from "@/lib/bank-parsers";
 import { classify } from "@/lib/tx-classifier";
+import { logAudit } from "@/lib/audit";
 
 export type DbTx = {
   id: string;
@@ -64,6 +65,7 @@ export async function fetchBankTransactions(bankId: string): Promise<DbTx[]> {
       .from("bank_transactions")
       .select(SELECT_TX)
       .eq("bank_id", bankId)
+      .is("deleted_at", null)
       .order("date", { ascending: false })
       .range(from, from + page - 1);
     if (error) throw error;
@@ -76,7 +78,11 @@ export async function fetchBankTransactions(bankId: string): Promise<DbTx[]> {
 }
 
 export async function fetchStatements(bankId?: string): Promise<DbStatement[]> {
-  let q = supabase.from("bank_statements").select("*").order("created_at", { ascending: false });
+  let q = supabase
+    .from("bank_statements")
+    .select("*")
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false });
   if (bankId) q = q.eq("bank_id", bankId);
   const { data, error } = await q;
   if (error) throw error;
@@ -230,17 +236,178 @@ export async function commitStatement(opts: {
     file_type: source,
     parser: parsed.parser,
     tx_count: imported,
+    status: "completed",
+  });
+
+  await logAudit({
+    action: "statement_uploaded",
+    entity: "bank_statements",
+    entityId: statementId,
+    description: `${file.name} yüklendi (${bank.name})`,
+    affected: imported,
+    meta: { parser: parsed.parser, fileType: source },
   });
 
   return { imported, statementId };
 }
 
+/** Silme = çöp kutusuna taşıma. Dosya ve hareketler korunur, geri yüklenebilir. */
 export async function deleteStatement(row: DbStatement) {
+  const now = new Date().toISOString();
+  const { error: tErr } = await supabase
+    .from("bank_transactions")
+    .update({ deleted_at: now })
+    .eq("statement_id", row.id);
+  if (tErr) throw tErr;
+  const { error } = await supabase.from("bank_statements").update({ deleted_at: now }).eq("id", row.id);
+  if (error) throw error;
+  await logAudit({
+    action: "statement_deleted",
+    entity: "bank_statements",
+    entityId: row.id,
+    description: `${row.file_name} çöp kutusuna taşındı`,
+    affected: row.tx_count,
+  });
+}
+
+export async function restoreStatement(row: DbStatement) {
+  const { error: tErr } = await supabase
+    .from("bank_transactions")
+    .update({ deleted_at: null })
+    .eq("statement_id", row.id);
+  if (tErr) throw tErr;
+  const { error } = await supabase.from("bank_statements").update({ deleted_at: null }).eq("id", row.id);
+  if (error) throw error;
+  await logAudit({
+    action: "statement_restored",
+    entity: "bank_statements",
+    entityId: row.id,
+    description: `${row.file_name} geri yüklendi`,
+    affected: row.tx_count,
+  });
+}
+
+/** Çöp kutusundaki ekstreler. */
+export async function fetchTrashedStatements(): Promise<DbStatement[]> {
+  const { data, error } = await supabase
+    .from("bank_statements")
+    .select("*")
+    .not("deleted_at", "is", null)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as unknown as DbStatement[];
+}
+
+/** Kalıcı silme — yalnızca çöp kutusundan açıkça istendiğinde. */
+export async function purgeStatement(row: DbStatement) {
   await supabase.storage.from("bank-statements").remove([row.file_path]);
   const { error: tErr } = await supabase.from("bank_transactions").delete().eq("statement_id", row.id);
   if (tErr) throw tErr;
   const { error } = await supabase.from("bank_statements").delete().eq("id", row.id);
   if (error) throw error;
+  await logAudit({
+    action: "statement_deleted",
+    entity: "bank_statements",
+    entityId: row.id,
+    description: `${row.file_name} kalıcı olarak silindi`,
+  });
+}
+
+/** Hareketi çöp kutusuna taşı / geri yükle. */
+export async function trashTransactions(ids: string[]) {
+  if (!ids.length) return;
+  const { error } = await supabase
+    .from("bank_transactions")
+    .update({ deleted_at: new Date().toISOString() })
+    .in("id", ids);
+  if (error) throw error;
+  await logAudit({ action: "tx_deleted", entity: "bank_transactions", affected: ids.length });
+}
+
+export async function restoreTransactions(ids: string[]) {
+  if (!ids.length) return;
+  const { error } = await supabase.from("bank_transactions").update({ deleted_at: null }).in("id", ids);
+  if (error) throw error;
+  await logAudit({ action: "tx_restored", entity: "bank_transactions", affected: ids.length });
+}
+
+export async function fetchTrashedTransactions(bankId?: string): Promise<DbTx[]> {
+  let q = supabase
+    .from("bank_transactions")
+    .select(SELECT_TX)
+    .not("deleted_at", "is", null)
+    .order("date", { ascending: false })
+    .limit(1000);
+  if (bankId) q = q.eq("bank_id", bankId);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []) as unknown as DbTx[];
+}
+
+/* ---------- Hesaplar (Accounts) ---------- */
+
+export type DbAccount = {
+  id: string;
+  bank_id: string;
+  account_no: string | null;
+  iban: string | null;
+  account_name: string | null;
+  currency: string;
+  last_balance: number;
+  active: boolean;
+  created_at: string;
+};
+
+export async function fetchAccounts(bankId?: string): Promise<DbAccount[]> {
+  let q = supabase
+    .from("bank_accounts")
+    .select("id,bank_id,account_no,iban,account_name,currency,last_balance,active,created_at")
+    .is("deleted_at", null)
+    .order("created_at", { ascending: true });
+  if (bankId) q = q.eq("bank_id", bankId);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []) as unknown as DbAccount[];
+}
+
+export async function createAccount(input: {
+  bankId: string;
+  accountNo?: string;
+  iban?: string;
+  accountName?: string;
+  currency?: string;
+}): Promise<DbAccount> {
+  const { data: u, error: uErr } = await supabase.auth.getUser();
+  if (uErr || !u.user) throw new Error("Oturum bulunamadı");
+  const { data, error } = await supabase
+    .from("bank_accounts")
+    .insert({
+      user_id: u.user.id,
+      bank_id: input.bankId,
+      account_no: input.accountNo || null,
+      iban: input.iban || null,
+      account_name: input.accountName || null,
+      currency: input.currency || "TRY",
+    })
+    .select("id,bank_id,account_no,iban,account_name,currency,last_balance,active,created_at")
+    .single();
+  if (error) throw error;
+  await logAudit({
+    action: "account_created",
+    entity: "bank_accounts",
+    entityId: (data as { id: string }).id,
+    description: `${input.accountName || input.accountNo || input.iban || "Hesap"} oluşturuldu`,
+  });
+  return data as unknown as DbAccount;
+}
+
+export async function softDeleteAccount(id: string) {
+  const { error } = await supabase
+    .from("bank_accounts")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+  await logAudit({ action: "account_deleted", entity: "bank_accounts", entityId: id });
 }
 
 export async function getStatementUrl(path: string): Promise<string> {
@@ -255,4 +422,5 @@ export async function updateTransaction(
 ) {
   const { error } = await supabase.from("bank_transactions").update(patch).eq("id", id);
   if (error) throw error;
+  await logAudit({ action: "tx_updated", entity: "bank_transactions", entityId: id });
 }
