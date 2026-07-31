@@ -53,33 +53,137 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_logs: {
+        Row: {
+          action: string
+          actor: string | null
+          affected_count: number
+          created_at: string
+          description: string | null
+          entity: string
+          entity_id: string | null
+          id: string
+          meta: Json | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          actor?: string | null
+          affected_count?: number
+          created_at?: string
+          description?: string | null
+          entity: string
+          entity_id?: string | null
+          id?: string
+          meta?: Json | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          actor?: string | null
+          affected_count?: number
+          created_at?: string
+          description?: string | null
+          entity?: string
+          entity_id?: string | null
+          id?: string
+          meta?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      bank_accounts: {
+        Row: {
+          account_name: string | null
+          account_no: string | null
+          active: boolean
+          bank_id: string
+          created_at: string
+          currency: string
+          deleted_at: string | null
+          iban: string | null
+          id: string
+          last_balance: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_name?: string | null
+          account_no?: string | null
+          active?: boolean
+          bank_id: string
+          created_at?: string
+          currency?: string
+          deleted_at?: string | null
+          iban?: string | null
+          id?: string
+          last_balance?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_name?: string | null
+          account_no?: string | null
+          active?: boolean
+          bank_id?: string
+          created_at?: string
+          currency?: string
+          deleted_at?: string | null
+          iban?: string | null
+          id?: string
+          last_balance?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_accounts_bank_id_fkey"
+            columns: ["bank_id"]
+            isOneToOne: false
+            referencedRelation: "banks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bank_imports: {
         Row: {
+          account_id: string | null
           bank_id: string
+          deleted_at: string | null
+          file_hash: string | null
           file_name: string
           file_type: string
           id: string
           parser: string | null
+          status: string
           tx_count: number
           uploaded_at: string
           user_id: string
         }
         Insert: {
+          account_id?: string | null
           bank_id: string
+          deleted_at?: string | null
+          file_hash?: string | null
           file_name: string
           file_type: string
           id?: string
           parser?: string | null
+          status?: string
           tx_count?: number
           uploaded_at?: string
           user_id: string
         }
         Update: {
+          account_id?: string | null
           bank_id?: string
+          deleted_at?: string | null
+          file_hash?: string | null
           file_name?: string
           file_type?: string
           id?: string
           parser?: string | null
+          status?: string
           tx_count?: number
           uploaded_at?: string
           user_id?: string
@@ -96,10 +200,12 @@ export type Database = {
       }
       bank_statements: {
         Row: {
+          account_id: string | null
           account_name: string
           bank_id: string | null
           bank_name: string
           created_at: string
+          deleted_at: string | null
           file_hash: string | null
           file_name: string
           file_path: string
@@ -118,10 +224,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_id?: string | null
           account_name?: string
           bank_id?: string | null
           bank_name?: string
           created_at?: string
+          deleted_at?: string | null
           file_hash?: string | null
           file_name: string
           file_path: string
@@ -140,10 +248,12 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_id?: string | null
           account_name?: string
           bank_id?: string | null
           bank_name?: string
           created_at?: string
+          deleted_at?: string | null
           file_hash?: string | null
           file_name?: string
           file_path?: string
@@ -173,6 +283,7 @@ export type Database = {
       }
       bank_transactions: {
         Row: {
+          account_id: string | null
           balance: number | null
           bank_id: string
           branch: string | null
@@ -185,6 +296,7 @@ export type Database = {
           date: string
           debit: number
           dedup_key: string | null
+          deleted_at: string | null
           description: string
           direction: string | null
           doc_no: string | null
@@ -206,6 +318,7 @@ export type Database = {
           value_date: string | null
         }
         Insert: {
+          account_id?: string | null
           balance?: number | null
           bank_id: string
           branch?: string | null
@@ -218,6 +331,7 @@ export type Database = {
           date: string
           debit?: number
           dedup_key?: string | null
+          deleted_at?: string | null
           description?: string
           direction?: string | null
           doc_no?: string | null
@@ -239,6 +353,7 @@ export type Database = {
           value_date?: string | null
         }
         Update: {
+          account_id?: string | null
           balance?: number | null
           bank_id?: string
           branch?: string | null
@@ -251,6 +366,7 @@ export type Database = {
           date?: string
           debit?: number
           dedup_key?: string | null
+          deleted_at?: string | null
           description?: string
           direction?: string | null
           doc_no?: string | null
@@ -300,15 +416,18 @@ export type Database = {
           account_name: string | null
           account_no: string | null
           active: boolean
+          bank_code: string | null
           created_at: string
           currency: string
           current_balance: number
+          deleted_at: string | null
           description: string | null
           iban: string | null
           id: string
           last_statement_date: string | null
           logo_url: string | null
           name: string
+          parser: string | null
           updated_at: string
           user_id: string
         }
@@ -316,15 +435,18 @@ export type Database = {
           account_name?: string | null
           account_no?: string | null
           active?: boolean
+          bank_code?: string | null
           created_at?: string
           currency?: string
           current_balance?: number
+          deleted_at?: string | null
           description?: string | null
           iban?: string | null
           id?: string
           last_statement_date?: string | null
           logo_url?: string | null
           name: string
+          parser?: string | null
           updated_at?: string
           user_id: string
         }
@@ -332,15 +454,18 @@ export type Database = {
           account_name?: string | null
           account_no?: string | null
           active?: boolean
+          bank_code?: string | null
           created_at?: string
           currency?: string
           current_balance?: number
+          deleted_at?: string | null
           description?: string | null
           iban?: string | null
           id?: string
           last_statement_date?: string | null
           logo_url?: string | null
           name?: string
+          parser?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -436,6 +561,24 @@ export type Database = {
         Update: {
           company?: Json
           data?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_prefs: {
+        Row: {
+          prefs: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          prefs?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          prefs?: Json
           updated_at?: string
           user_id?: string
         }
