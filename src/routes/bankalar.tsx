@@ -15,7 +15,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Landmark, Plus, Trash2, Upload, Loader2, RefreshCw, Wallet,
-  ArrowDownLeft, ArrowUpRight, Hash, ListOrdered,
+  ArrowDownLeft, ArrowUpRight, Hash, ListOrdered, Archive,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -25,6 +25,9 @@ import { EmptyState } from "@/components/empty-state";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { UploadStatementDialog } from "@/components/bank/upload-statement-dialog";
+import { BankArchiveDialog } from "@/components/bank/bank-archive-dialog";
+import { logAudit } from "@/lib/audit";
+import { savePrefs, usePrefs } from "@/lib/prefs";
 
 export const Route = createFileRoute("/bankalar")({
   head: () => ({
@@ -50,6 +53,8 @@ function Page() {
   const removeBank = useStore((s) => s.removeBank);
   const qc = useQueryClient();
 
+  const { prefs } = usePrefs();
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [uploadBankId, setUploadBankId] = useState<string | null>(null);
   const [openBank, setOpenBank] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -67,6 +72,7 @@ function Page() {
         const { data, error } = await supabase
           .from("bank_transactions")
           .select("bank_id,debit,credit,date")
+          .is("deleted_at", null)
           .order("date", { ascending: false })
           .range(from, from + page - 1);
         if (error) throw error;
@@ -107,6 +113,7 @@ function Page() {
       balance: 0,
       short: (form.short || form.name).slice(0, 4).toUpperCase(),
     });
+    void logAudit({ action: "bank_created", entity: "banks", description: `${form.name.trim()} eklendi` });
     setForm({ name: "", iban: "", accountNo: "", currency: "TRY", color: COLORS[0], short: "" });
     setOpenBank(false);
     toast.success("Banka eklendi");
@@ -131,6 +138,9 @@ function Page() {
               }}
             >
               <RefreshCw className="mr-2 h-4 w-4" /> Yenile
+            </Button>
+            <Button variant="outline" onClick={() => setArchiveOpen(true)}>
+              <Archive className="mr-2 h-4 w-4" /> Arşiv
             </Button>
             <Button onClick={() => setOpenBank(true)}>
               <Plus className="mr-2 h-4 w-4" /> Yeni Banka
@@ -159,7 +169,10 @@ function Page() {
             const a = aggOf(b.id);
             const balance = (b.balance ?? 0) + a.inn - a.out;
             return (
-              <Card key={b.id} className="overflow-hidden">
+              <Card
+                key={b.id}
+                className={`overflow-hidden ${prefs.lastBankId === b.id ? "ring-2 ring-primary/40" : ""}`}
+              >
                 <div className="h-1.5" style={{ background: b.color }} />
                 <CardContent className="space-y-4 p-4">
                   <div className="flex items-start justify-between gap-2">
@@ -202,7 +215,11 @@ function Page() {
                       <Upload className="mr-2 h-4 w-4" /> Ekstre Yükle
                     </Button>
                     <Button size="sm" variant="outline" className="flex-1" asChild>
-                      <Link to="/bankalar/$id" params={{ id: b.id }}>
+                      <Link
+                        to="/bankalar/$id"
+                        params={{ id: b.id }}
+                        onClick={() => void savePrefs({ lastBankId: b.id })}
+                      >
                         <ListOrdered className="mr-2 h-4 w-4" /> Hareketler
                       </Link>
                     </Button>
@@ -287,11 +304,14 @@ function Page() {
                 const id = confirmDelete!;
                 setConfirmDelete(null);
                 removeBank(id);
-                await supabase.from("bank_transactions").delete().eq("bank_id", id);
-                await supabase.from("bank_statements").delete().eq("bank_id", id);
-                await supabase.from("banks").delete().eq("id", id);
+                const now = new Date().toISOString();
+                await supabase.from("bank_transactions").update({ deleted_at: now }).eq("bank_id", id);
+                await supabase.from("bank_statements").update({ deleted_at: now }).eq("bank_id", id);
+                await supabase.from("banks").update({ deleted_at: now, active: false }).eq("id", id);
+                void logAudit({ action: "bank_deleted", entity: "banks", entityId: id });
                 qc.invalidateQueries({ queryKey: ["bank-summary"] });
-                toast.success("Banka silindi");
+                qc.invalidateQueries({ queryKey: ["trash-statements"] });
+                toast.success("Banka çöp kutusuna taşındı");
               }}
             >
               Sil
@@ -299,6 +319,8 @@ function Page() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <BankArchiveDialog open={archiveOpen} onOpenChange={setArchiveOpen} />
 
       {uploadBank && (
         <UploadStatementDialog

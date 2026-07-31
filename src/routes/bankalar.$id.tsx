@@ -23,6 +23,7 @@ import { useSelection } from "@/hooks/use-selection";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { savePrefs } from "@/lib/prefs";
 
 export const Route = createFileRoute("/bankalar/$id")({
   head: () => ({ meta: [{ title: "İşlem Hareketleri — Fintra" }] }),
@@ -80,6 +81,10 @@ function Page() {
   const bulkRemoveBankTx = useStore((s) => s.bulkRemoveBankTx);
 
   // Fallback bank fetch (in case local store hasn't hydrated yet on this device).
+  useEffect(() => {
+    void savePrefs({ lastBankId: id });
+  }, [id]);
+
   const { data: remoteBank } = useQuery({
     queryKey: ["bank-detail", id],
     queryFn: async (): Promise<DbBank | null> => {
@@ -106,6 +111,7 @@ function Page() {
         .from("bank_transactions")
         .select("id, bank_id, statement_id, date, description, ref_no, debit, credit, balance, category, source")
         .eq("bank_id", id)
+        .is("deleted_at", null)
         .order("date", { ascending: false });
       if (error) throw error;
       return (data ?? []) as DbBankTx[];
