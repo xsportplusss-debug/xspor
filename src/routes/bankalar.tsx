@@ -1,33 +1,26 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Landmark, Plus, Trash2, Upload, Loader2, RefreshCw, Wallet,
-  ArrowDownLeft, ArrowUpRight, Hash, ListOrdered, Archive,
+  Landmark, Plus, Trash2, Upload, ListOrdered, Pencil, RefreshCw, Loader2,
+  ArrowDownLeft, ArrowUpRight, Wallet,
 } from "lucide-react";
-import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { fmt } from "@/lib/mock-data";
-import { useStore } from "@/lib/store";
 import { EmptyState } from "@/components/empty-state";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { BankFormDialog } from "@/components/bank/bank-form-dialog";
+import { ImportStatementDialog } from "@/components/bank/import-statement-dialog";
+import { bankDef, codeFromName } from "@/lib/banks/registry";
+import { deleteBank, fetchBanks, type BankRow } from "@/lib/banks/service";
 import { supabase } from "@/integrations/supabase/client";
-import { UploadStatementDialog } from "@/components/bank/upload-statement-dialog";
-import { BankArchiveDialog } from "@/components/bank/bank-archive-dialog";
-import { logAudit } from "@/lib/audit";
-import { savePrefs, usePrefs } from "@/lib/prefs";
 
 export const Route = createFileRoute("/bankalar")({
   head: () => ({
@@ -43,185 +36,169 @@ export const Route = createFileRoute("/bankalar")({
   component: Page,
 });
 
-const COLORS = ["#00A651", "#0055A4", "#004990", "#E30613", "#7B2CBF", "#F27A1A"];
-
-type Agg = { count: number; inn: number; out: number; last: string | null };
+type Agg = { count: number; inn: number; out: number; balance: number | null };
 
 function Page() {
-  const banks = useStore((s) => s.banks);
-  const addBank = useStore((s) => s.addBank);
-  const removeBank = useStore((s) => s.removeBank);
   const qc = useQueryClient();
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<BankRow | null>(null);
+  const [uploadFor, setUploadFor] = useState<BankRow | null>(null);
+  const [deleting, setDeleting] = useState<BankRow | null>(null);
 
-  const { prefs } = usePrefs();
-  const [archiveOpen, setArchiveOpen] = useState(false);
-  const [uploadBankId, setUploadBankId] = useState<string | null>(null);
-  const [openBank, setOpenBank] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    name: "", iban: "", accountNo: "", currency: "TRY", color: COLORS[0], short: "",
-  });
+  const banksQ = useQuery({ queryKey: ["banks"], queryFn: fetchBanks });
+  const banks = banksQ.data ?? [];
 
-  const summary = useQuery({
-    queryKey: ["bank-summary"],
-    queryFn: async (): Promise<Record<string, Agg>> => {
+  const aggQ = useQuery({
+    queryKey: ["bank-agg"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("bank_transactions")
+        .select("bank_id,debit,credit,balance,date")
+        .is("deleted_at", null)
+        .order("date", { ascending: true })
+        .limit(20000);
+      if (error) throw error;
       const map: Record<string, Agg> = {};
-      const page = 1000;
-      let from = 0;
-      for (;;) {
-        const { data, error } = await supabase
-          .from("bank_transactions")
-          .select("bank_id,debit,credit,date")
-          .is("deleted_at", null)
-          .order("date", { ascending: false })
-          .range(from, from + page - 1);
-        if (error) throw error;
-        const rows = data ?? [];
-        for (const r of rows) {
-          const a = (map[r.bank_id] ??= { count: 0, inn: 0, out: 0, last: null });
-          a.count++;
-          a.inn += Number(r.credit ?? 0);
-          a.out += Number(r.debit ?? 0);
-          if (!a.last || r.date > a.last) a.last = r.date;
-        }
-        if (rows.length < page) break;
-        from += page;
+      for (const r of (data ?? []) as { bank_id: string; debit: number; credit: number; balance: number | null }[]) {
+        const a = (map[r.bank_id] ??= { count: 0, inn: 0, out: 0, balance: null });
+        a.count++;
+        a.inn += Number(r.credit || 0);
+        a.out += Number(r.debit || 0);
+        if (r.balance != null) a.balance = Number(r.balance);
       }
       return map;
     },
   });
-
-  const aggOf = (id: string): Agg => summary.data?.[id] ?? { count: 0, inn: 0, out: 0, last: null };
+  const agg = aggQ.data ?? {};
 
   const totals = useMemo(() => {
-    const list = Object.values(summary.data ?? {});
-    const inn = list.reduce((a, x) => a + x.inn, 0);
-    const out = list.reduce((a, x) => a + x.out, 0);
-    const count = list.reduce((a, x) => a + x.count, 0);
-    const opening = banks.reduce((a, b) => a + (b.balance ?? 0), 0);
-    return { inn, out, count, balance: opening + inn - out };
-  }, [summary.data, banks]);
+    const list = Object.values(agg);
+    return {
+      count: list.reduce((a, x) => a + x.count, 0),
+      inn: list.reduce((a, x) => a + x.inn, 0),
+      out: list.reduce((a, x) => a + x.out, 0),
+      balance: banks.reduce((a, b) => a + Number(agg[b.id]?.balance ?? b.current_balance ?? 0), 0),
+    };
+  }, [agg, banks]);
 
-  const saveBank = () => {
-    if (!form.name.trim()) return toast.error("Banka adı girin");
-    addBank({
-      name: form.name.trim(),
-      iban: form.iban.trim(),
-      accountNo: form.accountNo.trim(),
-      currency: form.currency,
-      color: form.color,
-      balance: 0,
-      short: (form.short || form.name).slice(0, 4).toUpperCase(),
-    });
-    void logAudit({ action: "bank_created", entity: "banks", description: `${form.name.trim()} eklendi` });
-    setForm({ name: "", iban: "", accountNo: "", currency: "TRY", color: COLORS[0], short: "" });
-    setOpenBank(false);
-    toast.success("Banka eklendi");
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ["banks"] });
+    void qc.invalidateQueries({ queryKey: ["bank-agg"] });
   };
 
-  const uploadBank = banks.find((b) => b.id === uploadBankId) ?? null;
+  const doDelete = async () => {
+    if (!deleting) return;
+    try {
+      await deleteBank(deleting.id);
+      toast.success("Banka ve tüm hareketleri silindi");
+      setDeleting(null);
+      refresh();
+    } catch (e) {
+      toast.error("Silinemedi", { description: (e as Error).message });
+    }
+  };
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Bankalar"
-        subtitle="Banka hesapları, ekstre yükleme ve hareket yönetimi"
+        description="Banka hesaplarınızı yönetin, ekstre yükleyin ve tüm hareketleri görüntüleyin."
         actions={
-          <>
-            <Button
-              variant="outline"
-              onClick={() => {
-                qc.invalidateQueries({ queryKey: ["bank-summary"] });
-                qc.invalidateQueries({ queryKey: ["bank-tx"] });
-                qc.invalidateQueries({ queryKey: ["bank-statements"] });
-                toast.success("Yenilendi");
-              }}
-            >
-              <RefreshCw className="mr-2 h-4 w-4" /> Yenile
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={refresh}>
+              <RefreshCw className="mr-2 h-4 w-4" />Yenile
             </Button>
-            <Button variant="outline" onClick={() => setArchiveOpen(true)}>
-              <Archive className="mr-2 h-4 w-4" /> Arşiv
+            <Button size="sm" onClick={() => { setEditing(null); setFormOpen(true); }}>
+              <Plus className="mr-2 h-4 w-4" />Banka Ekle
             </Button>
-            <Button onClick={() => setOpenBank(true)}>
-              <Plus className="mr-2 h-4 w-4" /> Yeni Banka
-            </Button>
-          </>
+          </div>
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard icon={<Wallet className="h-4 w-4" />} label="Toplam Bakiye" value={fmt(totals.balance)} />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <SummaryCard icon={<Landmark className="h-4 w-4" />} label="Banka" value={String(banks.length)} />
+        <SummaryCard icon={<ListOrdered className="h-4 w-4" />} label="Hareket" value={String(totals.count)} />
         <SummaryCard icon={<ArrowDownLeft className="h-4 w-4 text-emerald-500" />} label="Toplam Giriş" value={fmt(totals.inn)} />
         <SummaryCard icon={<ArrowUpRight className="h-4 w-4 text-rose-500" />} label="Toplam Çıkış" value={fmt(totals.out)} />
-        <SummaryCard icon={<Hash className="h-4 w-4" />} label="İşlem Sayısı" value={String(totals.count)} />
       </div>
 
-      {banks.length === 0 ? (
+      {banksQ.isLoading ? (
+        <div className="grid place-items-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : banks.length === 0 ? (
         <EmptyState
           icon={Landmark}
           title="Henüz banka yok"
-          desc="Ekstre yüklemek için önce bir banka hesabı ekleyin."
-          action={<Button onClick={() => setOpenBank(true)}><Plus className="mr-2 h-4 w-4" /> Yeni Banka</Button>}
+          description="Banka ekleyerek ekstre yüklemeye başlayın."
+          action={<Button onClick={() => { setEditing(null); setFormOpen(true); }}><Plus className="mr-2 h-4 w-4" />Banka Ekle</Button>}
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {banks.map((b) => {
-            const a = aggOf(b.id);
-            const balance = (b.balance ?? 0) + a.inn - a.out;
+            const def = bankDef(b.bank_code ?? codeFromName(b.name));
+            const a = agg[b.id];
             return (
-              <Card
-                key={b.id}
-                className={`overflow-hidden ${prefs.lastBankId === b.id ? "ring-2 ring-primary/40" : ""}`}
-              >
-                <div className="h-1.5" style={{ background: b.color }} />
-                <CardContent className="space-y-4 p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-xs font-bold text-white"
-                          style={{ background: b.color }}
-                        >
-                          {b.short}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold">{b.name}</p>
-                          <p className="truncate text-xs text-muted-foreground">{b.iban || b.accountNo || "—"}</p>
-                        </div>
+              <Card key={b.id} className="overflow-hidden">
+                <div className="h-1.5" style={{ background: def?.color ?? "hsl(var(--primary))" }} />
+                <CardContent className="space-y-3 p-4">
+                  <div className="flex items-start gap-3">
+                    {b.logo_url ? (
+                      <img src={b.logo_url} alt={`${b.name} logosu`} className="h-10 w-10 rounded object-contain" />
+                    ) : (
+                      <div className="grid h-10 w-10 place-items-center rounded" style={{ background: `${def?.color ?? "#64748b"}22` }}>
+                        <Landmark className="h-5 w-5" style={{ color: def?.color ?? "#64748b" }} />
                       </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="truncate font-semibold">{b.name}</h3>
+                        {def ? <Badge variant="secondary" className="text-[10px]">{def.label}</Badge> : (
+                          <Badge variant="outline" className="text-[10px]">okuyucu yok</Badge>
+                        )}
+                      </div>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {b.account_name || "—"} {b.branch ? `• ${b.branch}` : ""}
+                      </p>
+                      <p className="truncate font-mono text-[11px] text-muted-foreground">{b.iban || b.account_no || "—"}</p>
                     </div>
-                    <Button size="icon" variant="ghost" onClick={() => setConfirmDelete(b.id)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 rounded-md bg-muted/40 p-2 text-center text-xs">
+                    <div>
+                      <p className="text-muted-foreground">Hareket</p>
+                      <p className="font-semibold tabular-nums">{a?.count ?? 0}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Giriş</p>
+                      <p className="font-semibold tabular-nums text-emerald-500">{fmt(a?.inn ?? 0)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Çıkış</p>
+                      <p className="font-semibold tabular-nums text-rose-500">{fmt(a?.out ?? 0)}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-1 text-muted-foreground"><Wallet className="h-3.5 w-3.5" />Güncel bakiye</span>
+                    <span className="font-semibold tabular-nums">{fmt(Number(a?.balance ?? b.current_balance ?? 0))}</span>
+                  </div>
+                  {b.last_statement_date && (
+                    <p className="text-[11px] text-muted-foreground">Son ekstre: {b.last_statement_date.split("-").reverse().join(".")}</p>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button size="sm" onClick={() => setUploadFor(b)}>
+                      <Upload className="mr-2 h-4 w-4" />Ekstre Yükle
                     </Button>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-muted-foreground">Güncel Bakiye</p>
-                    <p className="text-2xl font-bold tabular-nums">{fmt(balance)}</p>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    <Metric label="Giriş" value={fmt(a.inn)} tone="text-emerald-500" />
-                    <Metric label="Çıkış" value={fmt(a.out)} tone="text-rose-500" />
-                    <Metric label="Hareket" value={String(a.count)} />
-                  </div>
-
-                  <p className="text-xs text-muted-foreground">
-                    Son ekstre: {a.last ? new Date(a.last).toLocaleDateString("tr-TR") : "—"}
-                  </p>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" className="flex-1" onClick={() => setUploadBankId(b.id)}>
-                      <Upload className="mr-2 h-4 w-4" /> Ekstre Yükle
-                    </Button>
-                    <Button size="sm" variant="outline" className="flex-1" asChild>
-                      <Link
-                        to="/bankalar/$id"
-                        params={{ id: b.id }}
-                        onClick={() => void savePrefs({ lastBankId: b.id })}
-                      >
-                        <ListOrdered className="mr-2 h-4 w-4" /> Hareketler
+                    <Button size="sm" variant="outline" asChild>
+                      <Link to="/bankalar/$id" params={{ id: b.id }}>
+                        <ListOrdered className="mr-2 h-4 w-4" />Hareketler
                       </Link>
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => { setEditing(b); setFormOpen(true); }}>
+                      <Pencil className="mr-2 h-4 w-4" />Düzenle
+                    </Button>
+                    <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setDeleting(b)}>
+                      <Trash2 className="mr-2 h-4 w-4" />Sil
                     </Button>
                   </div>
                 </CardContent>
@@ -231,109 +208,30 @@ function Page() {
         </div>
       )}
 
-      {summary.isLoading && (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Özet yükleniyor…
-        </p>
+      <BankFormDialog open={formOpen} onOpenChange={setFormOpen} bank={editing} onSaved={refresh} />
+      {uploadFor && (
+        <ImportStatementDialog
+          open={!!uploadFor}
+          onOpenChange={(o) => !o && setUploadFor(null)}
+          bank={uploadFor}
+          onDone={refresh}
+        />
       )}
 
-      <Dialog open={openBank} onOpenChange={setOpenBank}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Yeni Banka</DialogTitle></DialogHeader>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <Label>Banka Adı</Label>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="VakıfBank" />
-            </div>
-            <div className="sm:col-span-2">
-              <Label>IBAN</Label>
-              <Input value={form.iban} onChange={(e) => setForm({ ...form, iban: e.target.value })} placeholder="TR.." />
-            </div>
-            <div>
-              <Label>Hesap No</Label>
-              <Input value={form.accountNo} onChange={(e) => setForm({ ...form, accountNo: e.target.value })} />
-            </div>
-            <div>
-              <Label>Para Birimi</Label>
-              <Select value={form.currency} onValueChange={(v) => setForm({ ...form, currency: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {["TRY", "USD", "EUR", "GBP"].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Kısa Kod</Label>
-              <Input value={form.short} onChange={(e) => setForm({ ...form, short: e.target.value })} placeholder="VKF" />
-            </div>
-            <div>
-              <Label>Renk</Label>
-              <div className="flex flex-wrap gap-2 pt-2">
-                {COLORS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setForm({ ...form, color: c })}
-                    className={`h-7 w-7 rounded-full border-2 ${form.color === c ? "border-foreground" : "border-transparent"}`}
-                    style={{ background: c }}
-                    aria-label={`Renk ${c}`}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenBank(false)}>Vazgeç</Button>
-            <Button onClick={saveBank}>Kaydet</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+      <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Banka silinsin mi?</AlertDialogTitle>
+            <AlertDialogTitle>{deleting?.name} silinsin mi?</AlertDialogTitle>
             <AlertDialogDescription>
-              Bu bankaya ait yerel hareketler de kaldırılır. Bu işlem geri alınamaz.
+              Bu bankaya ait tüm hareketler ve yüklenmiş ekstreler kalıcı olarak silinir.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Vazgeç</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={async () => {
-                const id = confirmDelete!;
-                setConfirmDelete(null);
-                removeBank(id);
-                const now = new Date().toISOString();
-                await supabase.from("bank_transactions").update({ deleted_at: now }).eq("bank_id", id);
-                await supabase.from("bank_statements").update({ deleted_at: now }).eq("bank_id", id);
-                await supabase.from("banks").update({ deleted_at: now, active: false }).eq("id", id);
-                void logAudit({ action: "bank_deleted", entity: "banks", entityId: id });
-                qc.invalidateQueries({ queryKey: ["bank-summary"] });
-                qc.invalidateQueries({ queryKey: ["trash-statements"] });
-                toast.success("Banka çöp kutusuna taşındı");
-              }}
-            >
-              Sil
-            </AlertDialogAction>
+            <AlertDialogAction onClick={doDelete}>Sil</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <BankArchiveDialog open={archiveOpen} onOpenChange={setArchiveOpen} />
-
-      {uploadBank && (
-        <UploadStatementDialog
-          open={!!uploadBankId}
-          onOpenChange={(o) => !o && setUploadBankId(null)}
-          bank={uploadBank}
-          onDone={() => {
-            qc.invalidateQueries({ queryKey: ["bank-summary"] });
-            qc.invalidateQueries({ queryKey: ["bank-tx"] });
-            qc.invalidateQueries({ queryKey: ["bank-statements"] });
-          }}
-        />
-      )}
     </div>
   );
 }
@@ -341,22 +239,13 @@ function Page() {
 function SummaryCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <Card>
-      <CardContent className="flex items-center justify-between p-4">
+      <CardContent className="flex items-center gap-3 p-4">
+        <div className="grid h-9 w-9 place-items-center rounded-md bg-muted">{icon}</div>
         <div>
           <p className="text-xs text-muted-foreground">{label}</p>
-          <p className="text-xl font-bold tabular-nums">{value}</p>
+          <p className="font-semibold tabular-nums">{value}</p>
         </div>
-        <Badge variant="secondary" className="h-8 w-8 justify-center p-0">{icon}</Badge>
       </CardContent>
     </Card>
-  );
-}
-
-function Metric({ label, value, tone }: { label: string; value: string; tone?: string }) {
-  return (
-    <div className="rounded-md border p-2">
-      <p className="text-[10px] uppercase text-muted-foreground">{label}</p>
-      <p className={`truncate font-semibold tabular-nums ${tone ?? ""}`}>{value}</p>
-    </div>
   );
 }
