@@ -311,6 +311,7 @@ export type Database = {
           raw: Json | null
           ref_no: string | null
           source: string
+          statement_date: string | null
           statement_id: string | null
           tx_time: string | null
           user_description: string | null
@@ -346,6 +347,7 @@ export type Database = {
           raw?: Json | null
           ref_no?: string | null
           source?: string
+          statement_date?: string | null
           statement_id?: string | null
           tx_time?: string | null
           user_description?: string | null
@@ -381,6 +383,7 @@ export type Database = {
           raw?: Json | null
           ref_no?: string | null
           source?: string
+          statement_date?: string | null
           statement_id?: string | null
           tx_time?: string | null
           user_description?: string | null
@@ -417,6 +420,7 @@ export type Database = {
           account_no: string | null
           active: boolean
           bank_code: string | null
+          branch: string | null
           created_at: string
           currency: string
           current_balance: number
@@ -436,6 +440,7 @@ export type Database = {
           account_no?: string | null
           active?: boolean
           bank_code?: string | null
+          branch?: string | null
           created_at?: string
           currency?: string
           current_balance?: number
@@ -455,6 +460,7 @@ export type Database = {
           account_no?: string | null
           active?: boolean
           bank_code?: string | null
+          branch?: string | null
           created_at?: string
           currency?: string
           current_balance?: number
