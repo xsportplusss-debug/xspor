@@ -1,502 +1,392 @@
 import { createFileRoute, Link, useParams } from "@tanstack/react-router";
-import { PageHeader } from "@/components/page-header";
+import { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  ArrowLeft, ArrowDownLeft, ArrowUpRight, Pencil, Plus, Trash2,
-  ChevronLeft, ChevronRight, Search, ArrowUpDown, ChevronDown,
+  ArrowLeft, ArrowUpDown, Download, Landmark, Loader2, Plus, Trash2, Upload, X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { fmt, type BankTx } from "@/lib/mock-data";
-import { useStore, bankBalance } from "@/lib/store";
-import { useSelection } from "@/hooks/use-selection";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { savePrefs } from "@/lib/prefs";
+import { fmt } from "@/lib/mock-data";
+import { EmptyState } from "@/components/empty-state";
+import { ImportStatementDialog } from "@/components/bank/import-statement-dialog";
+import { bankDef, codeFromName } from "@/lib/banks/registry";
+import {
+  addTransaction, deleteStatement, deleteTransactions, fetchBanks, fetchStatements,
+  fetchTransactions, statementUrl, updateTransaction, type StatementRow, type TxRow,
+} from "@/lib/banks/service";
 
 export const Route = createFileRoute("/bankalar/$id")({
-  head: () => ({ meta: [{ title: "İşlem Hareketleri — Fintra" }] }),
+  head: () => ({
+    meta: [
+      { title: "Banka Hareketleri — Fintra" },
+      { name: "description", content: "Banka ekstresindeki tüm hareketleri satır satır görüntüleyin ve düzenleyin." },
+      { property: "og:title", content: "Banka Hareketleri — Fintra" },
+      { property: "og:description", content: "Ekstre hareketleri, filtreleme ve manuel düzenleme." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
   component: Page,
 });
 
-type Form = {
-  bankId: string; date: string; description: string; category: string;
-  type: "in" | "out"; amount: number;
+const trDate = (d?: string | null) => (d ? d.split("-").reverse().join(".") : "—");
+
+type Filters = {
+  from: string; to: string; desc: string; txNo: string;
+  amountMin: string; amountMax: string; kind: "all" | "debit" | "credit";
+  balanceMin: string; statementId: string;
 };
 
-type ManualForm = { date: string; amount: string; description: string };
-
-type SortDir = "desc" | "asc";
-
-function parseAmount(s: string): number {
-  const cleaned = s.replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
-  const n = Number(cleaned);
-  return isNaN(n) ? NaN : n;
-}
-
-type DbBankTx = {
-  id: string;
-  bank_id: string;
-  statement_id: string | null;
-  date: string;
-  description: string;
-  ref_no: string | null;
-  debit: number | string;
-  credit: number | string;
-  balance: number | string | null;
-  category: string | null;
-  source: string | null;
-};
-
-type DbBank = {
-  id: string;
-  name: string;
-  iban: string | null;
-  account_no: string | null;
-  currency: string | null;
+const EMPTY_F: Filters = {
+  from: "", to: "", desc: "", txNo: "", amountMin: "", amountMax: "", kind: "all", balanceMin: "", statementId: "all",
 };
 
 function Page() {
   const { id } = useParams({ from: "/bankalar/$id" });
-  const isMobile = useIsMobile();
   const qc = useQueryClient();
 
-  const banks = useStore((s) => s.banks);
-  const localBank = banks.find((b) => b.id === id);
-  const storeTx = useStore((s) => s.bankTx.filter((t) => t.bankId === id));
-  const addBankTx = useStore((s) => s.addBankTx);
-  const updateBankTx = useStore((s) => s.updateBankTx);
-  const removeBankTx = useStore((s) => s.removeBankTx);
-  const bulkRemoveBankTx = useStore((s) => s.bulkRemoveBankTx);
+  const banksQ = useQuery({ queryKey: ["banks"], queryFn: fetchBanks });
+  const bank = banksQ.data?.find((b) => b.id === id);
+  const def = bank ? bankDef(bank.bank_code ?? codeFromName(bank.name)) : undefined;
+  const layout = def?.layout ?? "halkbank";
 
-  // Fallback bank fetch (in case local store hasn't hydrated yet on this device).
-  useEffect(() => {
-    void savePrefs({ lastBankId: id });
-  }, [id]);
+  const txQ = useQuery({ queryKey: ["bank-tx", id], queryFn: () => fetchTransactions(id), enabled: !!id });
+  const stQ = useQuery({ queryKey: ["bank-stmts", id], queryFn: () => fetchStatements(id), enabled: !!id });
 
-  const { data: remoteBank } = useQuery({
-    queryKey: ["bank-detail", id],
-    queryFn: async (): Promise<DbBank | null> => {
-      const { data, error } = await supabase
-        .from("banks")
-        .select("id, name, iban, account_no, currency")
-        .eq("id", id)
-        .maybeSingle();
-      if (error) throw error;
-      return data as DbBank | null;
-    },
-    enabled: !localBank,
-  });
+  const [f, setF] = useState<Filters>(EMPTY_F);
+  const [asc, setAsc] = useState(true);
+  const [sel, setSel] = useState<string[]>([]);
+  const [detail, setDetail] = useState<TxRow | null>(null);
+  const [editing, setEditing] = useState<TxRow | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [upload, setUpload] = useState(false);
 
-  const bank = localBank ?? (remoteBank
-    ? { id: remoteBank.id, name: remoteBank.name, short: remoteBank.name.slice(0, 4), iban: remoteBank.iban || "", accountNo: remoteBank.account_no || undefined, currency: remoteBank.currency || "TRY", balance: 0, color: "#0055A4" }
-    : undefined);
+  const set = (k: keyof Filters, v: string) => setF((p) => ({ ...p, [k]: v }));
 
-  // Authoritative per-bank transactions from Supabase (all statements combined).
-  const { data: dbTx = [] } = useQuery({
-    queryKey: ["bank-tx", id],
-    queryFn: async (): Promise<DbBankTx[]> => {
-      const { data, error } = await supabase
-        .from("bank_transactions")
-        .select("id, bank_id, statement_id, date, description, ref_no, debit, credit, balance, category, source")
-        .eq("bank_id", id)
-        .is("deleted_at", null)
-        .order("date", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as DbBankTx[];
-    },
-  });
-
-  // Merge: keep local store tx as the primary display (it drives balance/analytics
-  // across the app), and surface any DB rows that aren't represented locally so
-  // the button reliably shows every uploaded statement's transactions.
-  const tx: BankTx[] = useMemo(() => {
-    const keyOf = (d: string, amt: number, desc: string) =>
-      `${d}|${amt.toFixed(2)}|${(desc || "").slice(0, 80).toLowerCase()}`;
-    const localKeys = new Set(storeTx.map((t) => keyOf(t.date, t.amount, t.description)));
-    const extras: BankTx[] = [];
-    for (const r of dbTx) {
-      const amount = Number(r.credit || 0) - Number(r.debit || 0);
-      const k = keyOf(r.date, amount, r.description || "");
-      if (localKeys.has(k)) continue;
-      extras.push({
-        id: `db:${r.id}`,
-        bankId: r.bank_id,
-        date: r.date,
-        description: r.description || "",
-        amount,
-        category: r.category || undefined,
-        refNo: r.ref_no || undefined,
-        balance: r.balance == null ? undefined : Number(r.balance),
-        source: (r.source as BankTx["source"]) || "PDF",
-        statementId: r.statement_id || undefined,
-      });
-    }
-    return [...storeTx, ...extras];
-  }, [storeTx, dbTx]);
-
-  const [openNew, setOpenNew] = useState(false);
-  const [editing, setEditing] = useState<BankTx | null>(null);
-  const emptyManual = (): ManualForm => ({
-    date: new Date().toISOString().slice(0, 10),
-    amount: "",
-    description: "",
-  });
-  const [form, setForm] = useState<ManualForm>(emptyManual());
-
-  // Auto-hydrate store from DB rows if store is empty for this bank (covers a
-  // fresh device where user_data hasn't restored bankTx yet).
-  useEffect(() => {
-    if (storeTx.length === 0 && dbTx.length > 0) {
-      const toAdd = dbTx.map<Omit<BankTx, "id">>((r) => {
-        const amount = Number(r.credit || 0) - Number(r.debit || 0);
-        return {
-          bankId: r.bank_id,
-          date: r.date,
-          description: r.description || "",
-          amount,
-          category: r.category || undefined,
-          refNo: r.ref_no || undefined,
-          balance: r.balance == null ? undefined : Number(r.balance),
-          source: (r.source as BankTx["source"]) || "PDF",
-          statementId: r.statement_id || undefined,
-        };
-      });
-      // Insert via store action so cloud-sync also picks them up.
-      useStore.getState().bulkAddBankTx(toAdd);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dbTx.length]);
-
-
-  // ---- Filters, sort, pagination ----
-  const [search, setSearch] = useState("");
-  const [refNoQuery, setRefNoQuery] = useState("");
-  const [amountQuery, setAmountQuery] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [flow, setFlow] = useState<"all" | "in" | "out">("all");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [pageSize, setPageSize] = useState(25);
-  const [page, setPage] = useState(1);
-
-  const filtered = useMemo(() => {
-    const s = search.trim().toLowerCase();
-    const r = refNoQuery.trim().toLowerCase();
-    const a = amountQuery.trim() ? Number(amountQuery.replace(",", ".")) : NaN;
-    return tx.filter((t) => {
-      if (dateFrom && t.date < dateFrom) return false;
-      if (dateTo && t.date > dateTo) return false;
-      if (flow === "in" && t.amount <= 0) return false;
-      if (flow === "out" && t.amount >= 0) return false;
-      if (s && !(t.description || "").toLowerCase().includes(s) &&
-          !(t.operation || "").toLowerCase().includes(s) &&
-          !(t.category || "").toLowerCase().includes(s)) return false;
-      if (r && !(t.refNo || "").toLowerCase().includes(r)) return false;
-      if (!isNaN(a) && Math.abs(Math.abs(t.amount) - Math.abs(a)) > 0.005) return false;
+  const rows = useMemo(() => {
+    const all = txQ.data ?? [];
+    const out = all.filter((t) => {
+      if (f.from && t.date < f.from) return false;
+      if (f.to && t.date > f.to) return false;
+      if (f.desc && !t.description.toLocaleLowerCase("tr-TR").includes(f.desc.toLocaleLowerCase("tr-TR"))) return false;
+      if (f.txNo && !(t.doc_no ?? "").includes(f.txNo)) return false;
+      const amount = Number(t.credit) - Number(t.debit);
+      if (f.amountMin && Math.abs(amount) < Number(f.amountMin)) return false;
+      if (f.amountMax && Math.abs(amount) > Number(f.amountMax)) return false;
+      if (f.kind === "debit" && Number(t.debit) <= 0) return false;
+      if (f.kind === "credit" && Number(t.credit) <= 0) return false;
+      if (f.balanceMin && Number(t.balance ?? 0) < Number(f.balanceMin)) return false;
+      if (f.statementId !== "all" && t.statement_id !== f.statementId) return false;
       return true;
     });
-  }, [tx, search, refNoQuery, amountQuery, dateFrom, dateTo, flow]);
+    return asc ? out : [...out].reverse();
+  }, [txQ.data, f, asc]);
 
-  const sorted = useMemo(() => {
-    const arr = [...filtered];
-    arr.sort((a, b) => {
-      const ka = `${a.date} ${a.time || "00:00"}`;
-      const kb = `${b.date} ${b.time || "00:00"}`;
-      return sortDir === "desc" ? (ka < kb ? 1 : -1) : (ka > kb ? 1 : -1);
-    });
-    return arr;
-  }, [filtered, sortDir]);
+  const totals = useMemo(() => ({
+    inn: rows.reduce((a, t) => a + Number(t.credit || 0), 0),
+    out: rows.reduce((a, t) => a + Number(t.debit || 0), 0),
+  }), [rows]);
 
-  const totalCount = sorted.length;
-  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const pageStart = (currentPage - 1) * pageSize;
-  const pageRows = sorted.slice(pageStart, pageStart + pageSize);
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ["bank-tx", id] });
+    void qc.invalidateQueries({ queryKey: ["bank-stmts", id] });
+    void qc.invalidateQueries({ queryKey: ["bank-agg"] });
+  };
 
-  const sel = useSelection(pageRows);
+  const removeSelected = async () => {
+    if (!sel.length) return;
+    try {
+      await deleteTransactions(sel);
+      toast.success(`${sel.length} hareket silindi`);
+      setSel([]);
+      refresh();
+    } catch (e) {
+      toast.error("Silinemedi", { description: (e as Error).message });
+    }
+  };
 
-  const totals = useMemo(() => {
-    let inn = 0, out = 0;
-    for (const t of filtered) { if (t.amount >= 0) inn += t.amount; else out += -t.amount; }
-    return { inn, out, net: inn - out };
-  }, [filtered]);
+  const removeStatement = async (s: StatementRow) => {
+    try {
+      await deleteStatement(s);
+      toast.success("Ekstre ve hareketleri silindi");
+      refresh();
+    } catch (e) {
+      toast.error("Silinemedi", { description: (e as Error).message });
+    }
+  };
 
+  if (banksQ.isLoading) {
+    return <div className="grid place-items-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
   if (!bank) {
     return (
-      <div className="space-y-6">
-        <PageHeader title="Bulunamadı" />
-        <Link to="/bankalar"><Button variant="outline"><ArrowLeft className="mr-1 h-4 w-4" /> Bankalar</Button></Link>
-      </div>
+      <EmptyState icon={Landmark} title="Banka bulunamadı" desc="Bu banka silinmiş olabilir."
+        action={<Button asChild><Link to="/bankalar">Bankalara dön</Link></Button>} />
     );
   }
 
-  const save = () => {
-    if (!form.date) return toast.error("Tarih girin");
-    const amt = parseAmount(form.amount);
-    if (!form.amount.trim() || isNaN(amt) || amt === 0) return toast.error("Geçerli bir tutar girin");
-    if (!form.description.trim()) return toast.error("Açıklama girin");
-    addBankTx({
-      bankId: id,
-      date: form.date,
-      description: form.description.trim(),
-      amount: amt,
-      source: "Manuel",
-    });
-    setOpenNew(false); setForm(emptyManual());
-    toast.success("Hareket eklendi");
-  };
-
-  const saveEdit = () => {
-    if (!editing) return;
-    updateBankTx(editing.id, editing);
-    setEditing(null);
-    toast.success("Güncellendi");
-  };
-
-  const resetFilters = () => {
-    setSearch(""); setRefNoQuery(""); setAmountQuery("");
-    setDateFrom(""); setDateTo(""); setFlow("all"); setPage(1);
-  };
-
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={`${bank.name} — İşlem Hareketleri`}
-        subtitle={bank.iban || "IBAN yok"}
-        actions={
-          <>
-            <Link to="/bankalar"><Button variant="outline" size="sm"><ArrowLeft className="mr-1 h-4 w-4" /> Geri</Button></Link>
-            <Dialog open={openNew} onOpenChange={(v) => { setOpenNew(v); if (v) setForm(emptyManual()); }}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="gradient-primary text-primary-foreground shadow-elegant">
-                  <Plus className="mr-1 h-4 w-4" /> Manuel İşlem Ekle
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader><DialogTitle>Manuel İşlem Ekle</DialogTitle></DialogHeader>
-                <div className="grid gap-3">
-                  <div>
-                    <Label>Tarih</Label>
-                    <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-                  </div>
-                  <div>
-                    <Label>Tutar</Label>
-                    <Input
-                      inputMode="decimal"
-                      placeholder="Örn: 5000 veya -1250,50"
-                      value={form.amount}
-                      onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                    />
-                    <p className="mt-1 text-[11px] text-muted-foreground">Negatif değer çıkış, pozitif değer giriş olarak kaydedilir.</p>
-                  </div>
-                  <div>
-                    <Label>Açıklama</Label>
-                    <Input
-                      placeholder="Örn: Kasa para aktarımı"
-                      value={form.description}
-                      onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setOpenNew(false)}>İptal</Button>
-                  <Button onClick={save} className="gradient-primary text-primary-foreground">Kaydet</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </>
-        }
-      />
-
-      <div className="grid gap-3 sm:grid-cols-4">
-        <Card className="glass"><CardContent className="p-4">
-          <div className="text-xs text-muted-foreground">Güncel Bakiye</div>
-          <div className="text-xl font-bold">{fmt(bankBalance(id), bank.currency)}</div>
-        </CardContent></Card>
-        <Card className="glass"><CardContent className="p-4">
-          <div className="text-xs text-muted-foreground">Toplam Gelen</div>
-          <div className="text-xl font-bold text-success">{fmt(totals.inn, bank.currency)}</div>
-        </CardContent></Card>
-        <Card className="glass"><CardContent className="p-4">
-          <div className="text-xs text-muted-foreground">Toplam Giden</div>
-          <div className="text-xl font-bold text-destructive">{fmt(totals.out, bank.currency)}</div>
-        </CardContent></Card>
-        <Card className="glass"><CardContent className="p-4">
-          <div className="text-xs text-muted-foreground">Toplam İşlem</div>
-          <div className="text-xl font-bold">{tx.length.toLocaleString("tr-TR")}</div>
-        </CardContent></Card>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" asChild><Link to="/bankalar"><ArrowLeft className="h-4 w-4" /></Link></Button>
+          {bank.logo_url ? (
+            <img src={bank.logo_url} alt={`${bank.name} logosu`} className="h-10 w-10 rounded object-contain" />
+          ) : (
+            <div className="grid h-10 w-10 place-items-center rounded" style={{ background: `${def?.color ?? "#64748b"}22` }}>
+              <Landmark className="h-5 w-5" style={{ color: def?.color ?? "#64748b" }} />
+            </div>
+          )}
+          <div>
+            <h1 className="text-xl font-bold">{bank.name} — Hareketler</h1>
+            <p className="text-xs text-muted-foreground">
+              {bank.account_name || "—"} {bank.branch ? `• ${bank.branch}` : ""} {bank.iban ? `• ${bank.iban}` : ""}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => setAsc((v) => !v)}>
+            <ArrowUpDown className="mr-2 h-4 w-4" />{asc ? "Eski → Yeni" : "Yeni → Eski"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
+            <Plus className="mr-2 h-4 w-4" />Yeni Hareket
+          </Button>
+          <Button size="sm" onClick={() => setUpload(true)}>
+            <Upload className="mr-2 h-4 w-4" />Ekstre Yükle
+          </Button>
+        </div>
       </div>
 
-      {/* Filters */}
-      <Card className="glass">
-        <CardContent className="p-4 space-y-3">
-          <div className="grid gap-2 md:grid-cols-6">
-            <div className="md:col-span-2 relative">
-              <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input className="pl-8" placeholder="Açıklama / İşlem adı ara" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
-            </div>
-            <Input placeholder="İşlem No" value={refNoQuery} onChange={(e) => { setRefNoQuery(e.target.value); setPage(1); }} />
-            <Input placeholder="Tutar" inputMode="decimal" value={amountQuery} onChange={(e) => { setAmountQuery(e.target.value); setPage(1); }} />
-            <Input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} />
-            <Input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Select value={flow} onValueChange={(v) => { setFlow(v as "all" | "in" | "out"); setPage(1); }}>
-              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+      <Card>
+        <CardContent className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-1.5"><Label className="text-xs">Başlangıç</Label>
+            <Input type="date" value={f.from} onChange={(e) => set("from", e.target.value)} /></div>
+          <div className="grid gap-1.5"><Label className="text-xs">Bitiş</Label>
+            <Input type="date" value={f.to} onChange={(e) => set("to", e.target.value)} /></div>
+          <div className="grid gap-1.5"><Label className="text-xs">Açıklama</Label>
+            <Input value={f.desc} onChange={(e) => set("desc", e.target.value)} placeholder="EFT, FAST…" /></div>
+          <div className="grid gap-1.5"><Label className="text-xs">İşlem No</Label>
+            <Input value={f.txNo} onChange={(e) => set("txNo", e.target.value)} /></div>
+          <div className="grid gap-1.5"><Label className="text-xs">Min Tutar</Label>
+            <Input type="number" value={f.amountMin} onChange={(e) => set("amountMin", e.target.value)} /></div>
+          <div className="grid gap-1.5"><Label className="text-xs">Maks Tutar</Label>
+            <Input type="number" value={f.amountMax} onChange={(e) => set("amountMax", e.target.value)} /></div>
+          <div className="grid gap-1.5"><Label className="text-xs">Tür</Label>
+            <Select value={f.kind} onValueChange={(v) => set("kind", v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tümü</SelectItem>
-                <SelectItem value="in">Sadece Gelen</SelectItem>
-                <SelectItem value="out">Sadece Giden</SelectItem>
+                <SelectItem value="debit">Borç (çıkış)</SelectItem>
+                <SelectItem value="credit">Alacak (giriş)</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" size="sm" onClick={() => setSortDir((d) => (d === "desc" ? "asc" : "desc"))}>
-              <ArrowUpDown className="mr-1 h-4 w-4" />
-              {sortDir === "desc" ? "En Yeni" : "En Eski"}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={resetFilters}>Filtreleri Temizle</Button>
-            <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
-              <span>Toplam <b className="text-foreground">{totalCount.toLocaleString("tr-TR")}</b> işlem</span>
-              <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
-                <SelectTrigger className="h-8 w-[110px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="25">25 / sayfa</SelectItem>
-                  <SelectItem value="50">50 / sayfa</SelectItem>
-                  <SelectItem value="100">100 / sayfa</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          </div>
+          <div className="grid gap-1.5"><Label className="text-xs">Ekstre (dosya)</Label>
+            <Select value={f.statementId} onValueChange={(v) => set("statementId", v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tüm ekstreler</SelectItem>
+                {(stQ.data ?? []).map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.file_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
+            <Button variant="ghost" size="sm" onClick={() => setF(EMPTY_F)}><X className="mr-2 h-4 w-4" />Filtreleri temizle</Button>
+            <span className="text-xs text-muted-foreground">
+              {rows.length} hareket • Giriş <b className="text-emerald-500">{fmt(totals.inn)}</b> • Çıkış <b className="text-rose-500">{fmt(totals.out)}</b>
+            </span>
+            {!!sel.length && (
+              <Button variant="destructive" size="sm" className="ml-auto" onClick={removeSelected}>
+                <Trash2 className="mr-2 h-4 w-4" />{sel.length} hareketi sil
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Bulk actions */}
-      {sel.selectedIds.length > 0 && (
-        <div className="flex items-center gap-2 rounded-lg border bg-card p-3">
-          <span className="text-xs text-muted-foreground">{sel.selectedIds.length} hareket seçili</span>
-          <Button variant="destructive" size="sm"
-            onClick={() => { bulkRemoveBankTx(sel.selectedIds); sel.clear(); toast.success("Silindi"); }}>
-            <Trash2 className="mr-1 h-4 w-4" /> Sil
-          </Button>
-        </div>
-      )}
-
-      {/* Data */}
-      {isMobile ? (
-        <MobileList
-          rows={pageRows}
-          currency={bank.currency}
-          selected={sel.selected}
-          onToggle={sel.toggle}
-          onEdit={setEditing}
-          onDelete={(id2) => { removeBankTx(id2); toast.success("Silindi"); }}
-        />
-      ) : (
-        <Card className="glass"><CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10">
-                    <Checkbox
-                      checked={sel.allChecked ? true : sel.someChecked ? "indeterminate" : false}
-                      onCheckedChange={sel.toggleAll}
-                    />
-                  </TableHead>
-                  <TableHead>Tarih</TableHead>
-                  <TableHead>Saat</TableHead>
-                  <TableHead>İşlem No</TableHead>
-                  <TableHead>İşlem Adı</TableHead>
-                  <TableHead>Açıklama</TableHead>
-                  <TableHead className="text-right">Para Girişi</TableHead>
-                  <TableHead className="text-right">Para Çıkışı</TableHead>
-                  <TableHead className="text-right">Bakiye</TableHead>
-                  <TableHead className="w-20"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pageRows.length === 0 && (
-                  <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">
-                    Kayıt bulunamadı
-                  </TableCell></TableRow>
-                )}
-                {pageRows.map((t) => (
-                  <TableRow key={t.id} data-state={sel.selected.has(t.id) ? "selected" : undefined}>
-                    <TableCell><Checkbox checked={sel.selected.has(t.id)} onCheckedChange={() => sel.toggle(t.id)} /></TableCell>
-                    <TableCell className="text-muted-foreground whitespace-nowrap">{t.date}</TableCell>
-                    <TableCell className="text-muted-foreground whitespace-nowrap">{t.time || "—"}</TableCell>
-                    <TableCell className="font-mono text-xs">{t.refNo || "—"}</TableCell>
-                    <TableCell className="whitespace-nowrap">{t.operation || t.category || (t.source === "Manuel" ? <Badge variant="secondary">Manuel</Badge> : "—")}</TableCell>
-                    <TableCell className="max-w-[360px] truncate" title={t.description}>{t.description}</TableCell>
-                    <TableCell className="text-right font-semibold text-success">
-                      {t.amount > 0 ? <span className="inline-flex items-center gap-1"><ArrowDownLeft className="h-3.5 w-3.5" />{fmt(t.amount, bank.currency)}</span> : "—"}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold text-destructive">
-                      {t.amount < 0 ? <span className="inline-flex items-center gap-1"><ArrowUpRight className="h-3.5 w-3.5" />{fmt(-t.amount, bank.currency)}</span> : "—"}
-                    </TableCell>
-                    <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap">
-                      {typeof t.balance === "number" ? fmt(t.balance, bank.currency) : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => setEditing(t)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => { removeBankTx(t.id); toast.success("Silindi"); }}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
+      <Card>
+        <CardContent className="p-0">
+          {txQ.isLoading ? (
+            <div className="grid place-items-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : rows.length === 0 ? (
+            <div className="p-10"><EmptyState icon={Landmark} title="Hareket yok" desc="Ekstre yükleyin veya manuel hareket ekleyin." /></div>
+          ) : (
+            <div className="max-h-[70vh] overflow-auto">
+              <Table>
+                <TableHeader className="sticky top-0 z-10 bg-background">
+                  <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={sel.length > 0 && sel.length === rows.length}
+                        onCheckedChange={(c) => setSel(c ? rows.map((r) => r.id) : [])}
+                      />
+                    </TableHead>
+                    <TableHead className="w-28">Tarih</TableHead>
+                    {layout === "vakifbank" && <TableHead className="w-16">Saat</TableHead>}
+                    {layout === "vakifbank" && <TableHead className="w-28">İşlem No</TableHead>}
+                    <TableHead className="min-w-[280px]">{layout === "vakifbank" ? "İşlem Adı" : "Açıklama"}</TableHead>
+                    {layout === "vakifbank" ? (
+                      <TableHead className="w-32 text-right">Miktar</TableHead>
+                    ) : (
+                      <>
+                        <TableHead className="w-28 text-right">Borç</TableHead>
+                        <TableHead className="w-28 text-right">Alacak</TableHead>
+                      </>
+                    )}
+                    <TableHead className="w-32 text-right">Bakiye</TableHead>
+                    <TableHead className="w-10" />
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent></Card>
-      )}
+                </TableHeader>
+                <TableBody>
+                  {rows.map((t) => {
+                    const amount = Number(t.credit) - Number(t.debit);
+                    return (
+                      <TableRow key={t.id} className="cursor-pointer" onClick={() => setDetail(t)}>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={sel.includes(t.id)}
+                            onCheckedChange={(c) =>
+                              setSel((p) => (c ? [...p, t.id] : p.filter((x) => x !== t.id)))
+                            }
+                          />
+                        </TableCell>
+                        <TableCell className="tabular-nums">{trDate(t.date)}</TableCell>
+                        {layout === "vakifbank" && <TableCell className="text-xs">{t.tx_time ?? "—"}</TableCell>}
+                        {layout === "vakifbank" && <TableCell className="text-xs">{t.doc_no ?? "—"}</TableCell>}
+                        <TableCell className="text-xs">
+                          {t.description}
+                          {t.source === "Manuel" && <Badge variant="outline" className="ml-2 text-[10px]">Manuel</Badge>}
+                        </TableCell>
+                        {layout === "vakifbank" ? (
+                          <TableCell className={`text-right tabular-nums ${amount < 0 ? "text-rose-500" : "text-emerald-500"}`}>
+                            {fmt(amount)}
+                          </TableCell>
+                        ) : (
+                          <>
+                            <TableCell className="text-right tabular-nums text-rose-500">
+                              {Number(t.debit) ? fmt(Number(t.debit)) : "—"}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums text-emerald-500">
+                              {Number(t.credit) ? fmt(Number(t.credit)) : "—"}
+                            </TableCell>
+                          </>
+                        )}
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          {t.balance != null ? fmt(Number(t.balance)) : "—"}
+                        </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Button size="icon" variant="ghost" onClick={() => setEditing(t)}>
+                            <Plus className="hidden" />
+                            <span className="text-xs">Düzenle</span>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-      {/* Pagination */}
-      <Pagination
-        page={currentPage}
-        pageSize={pageSize}
-        total={totalCount}
-        onChange={setPage}
+      <Card>
+        <CardContent className="space-y-2 p-4">
+          <h2 className="font-semibold">İçe Aktarma Geçmişi</h2>
+          {(stQ.data ?? []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">Henüz ekstre yüklenmedi.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Dosya</TableHead>
+                    <TableHead className="w-40">Dönem</TableHead>
+                    <TableHead className="w-24 text-right">Hareket</TableHead>
+                    <TableHead className="w-36">Yüklenme</TableHead>
+                    <TableHead className="w-40" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(stQ.data ?? []).map((s) => (
+                    <TableRow key={s.id}>
+                      <TableCell className="text-xs">{s.file_name}</TableCell>
+                      <TableCell className="text-xs">{trDate(s.period_start)} → {trDate(s.period_end)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{s.tx_count}</TableCell>
+                      <TableCell className="text-xs">{new Date(s.created_at).toLocaleString("tr-TR")}</TableCell>
+                      <TableCell className="space-x-1 text-right">
+                        <Button size="sm" variant="ghost" onClick={() => set("statementId", s.id)}>Hareketleri</Button>
+                        <Button size="sm" variant="ghost" onClick={async () => {
+                          try { window.open(await statementUrl(s.file_path), "_blank"); }
+                          catch (e) { toast.error("İndirilemedi", { description: (e as Error).message }); }
+                        }}><Download className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" className="text-destructive" onClick={() => removeStatement(s)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <ImportStatementDialog open={upload} onOpenChange={setUpload} bank={bank} onDone={refresh} />
+
+      <TxDialog
+        open={adding || !!editing}
+        tx={editing}
+        layout={layout}
+        onOpenChange={(o) => { if (!o) { setAdding(false); setEditing(null); } }}
+        onSave={async (v) => {
+          try {
+            if (editing) await updateTransaction(editing.id, v);
+            else await addTransaction(id, v);
+            toast.success("Kaydedildi");
+            setAdding(false); setEditing(null);
+            refresh();
+          } catch (e) {
+            toast.error("Kaydedilemedi", { description: (e as Error).message });
+          }
+        }}
       />
 
-      {/* Edit dialog */}
-      <Dialog open={!!editing} onOpenChange={(v) => !v && setEditing(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Hareketi Düzenle</DialogTitle></DialogHeader>
-          {editing && (
-            <TxForm
-              value={{
-                bankId: editing.bankId, date: editing.date,
-                description: editing.description, category: editing.category || "",
-                type: editing.amount >= 0 ? "in" : "out",
-                amount: Math.abs(editing.amount),
-              }}
-              onChange={(f) => setEditing({
-                ...editing, bankId: f.bankId, date: f.date, description: f.description,
-                category: f.category || undefined,
-                amount: f.type === "in" ? Math.abs(f.amount) : -Math.abs(f.amount),
-              })}
-              banks={banks}
-            />
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Hareket Detayı</DialogTitle></DialogHeader>
+          {detail && (
+            <dl className="grid grid-cols-[120px_1fr] gap-y-2 text-sm">
+              <dt className="text-muted-foreground">Banka</dt><dd>{bank.name}</dd>
+              <dt className="text-muted-foreground">Dosya Adı</dt><dd className="break-all">{detail.file_name ?? "Manuel"}</dd>
+              <dt className="text-muted-foreground">Tarih</dt><dd>{trDate(detail.date)}</dd>
+              <dt className="text-muted-foreground">Saat</dt><dd>{detail.tx_time ?? "—"}</dd>
+              <dt className="text-muted-foreground">İşlem No</dt><dd>{detail.doc_no ?? "—"}</dd>
+              <dt className="text-muted-foreground">Açıklama</dt><dd>{detail.description}</dd>
+              <dt className="text-muted-foreground">Tutar</dt><dd>{fmt(Number(detail.credit) - Number(detail.debit))}</dd>
+              <dt className="text-muted-foreground">Borç</dt><dd>{fmt(Number(detail.debit))}</dd>
+              <dt className="text-muted-foreground">Alacak</dt><dd>{fmt(Number(detail.credit))}</dd>
+              <dt className="text-muted-foreground">Bakiye</dt><dd>{detail.balance != null ? fmt(Number(detail.balance)) : "—"}</dd>
+              <dt className="text-muted-foreground">İçe Aktarma</dt>
+              <dd>{new Date(detail.imported_at ?? detail.created_at).toLocaleString("tr-TR")}</dd>
+            </dl>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditing(null)}>İptal</Button>
-            <Button onClick={saveEdit} className="gradient-primary text-primary-foreground">Güncelle</Button>
+            <Button variant="outline" onClick={() => { setEditing(detail); setDetail(null); }}>Düzenle</Button>
+            <Button onClick={() => setDetail(null)}>Kapat</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -504,141 +394,84 @@ function Page() {
   );
 }
 
-function MobileList({
-  rows, currency, selected, onToggle, onEdit, onDelete,
+type TxForm = {
+  date: string; tx_time: string; doc_no: string; description: string;
+  debit: string; credit: string; balance: string;
+};
+
+function TxDialog({
+  open, tx, layout, onOpenChange, onSave,
 }: {
-  rows: BankTx[]; currency: string; selected: Set<string>;
-  onToggle: (id: string) => void; onEdit: (t: BankTx) => void; onDelete: (id: string) => void;
+  open: boolean;
+  tx: TxRow | null;
+  layout: "halkbank" | "vakifbank";
+  onOpenChange: (o: boolean) => void;
+  onSave: (v: {
+    date: string; tx_time: string | null; doc_no: string | null; description: string;
+    debit: number; credit: number; balance: number | null;
+  }) => Promise<void>;
 }) {
-  const [openId, setOpenId] = useState<string | null>(null);
-  if (rows.length === 0) {
-    return <Card className="glass"><CardContent className="p-8 text-center text-sm text-muted-foreground">Kayıt bulunamadı</CardContent></Card>;
-  }
-  return (
-    <div className="space-y-2">
-      {rows.map((t) => {
-        const open = openId === t.id;
-        return (
-          <Card key={t.id} className="glass">
-            <CardContent className="p-3">
-              <div className="flex items-start gap-2">
-                <Checkbox className="mt-1" checked={selected.has(t.id)} onCheckedChange={() => onToggle(t.id)} />
-                <div className="min-w-0 flex-1" onClick={() => setOpenId(open ? null : t.id)}>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-xs text-muted-foreground">{t.date}{t.time ? ` • ${t.time}` : ""}</div>
-                    <div className={`text-sm font-semibold ${t.amount >= 0 ? "text-success" : "text-destructive"}`}>
-                      {t.amount >= 0 ? "+" : "-"}{fmt(Math.abs(t.amount), currency)}
-                    </div>
-                  </div>
-                  <div className="mt-1 truncate text-sm">{t.description || "—"}</div>
-                  <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
-                    <span className="truncate">{t.operation || t.category || ""}</span>
-                    <span>{typeof t.balance === "number" ? `Bakiye: ${fmt(t.balance, currency)}` : ""}</span>
-                  </div>
-                  {open && (
-                    <div className="mt-2 grid grid-cols-2 gap-1 border-t pt-2 text-[11px] text-muted-foreground">
-                      <div>İşlem No: <span className="font-mono text-foreground">{t.refNo || "—"}</span></div>
-                      <div>Kategori: <span className="text-foreground">{t.category || "—"}</span></div>
-                    </div>
-                  )}
-                </div>
-                <button className="text-muted-foreground" onClick={() => setOpenId(open ? null : t.id)}>
-                  <ChevronDown className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`} />
-                </button>
-              </div>
-              {open && (
-                <div className="mt-2 flex justify-end gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => onEdit(t)}><Pencil className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="sm" onClick={() => onDelete(t.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
-  );
-}
+  const initial: TxForm = {
+    date: tx?.date ?? new Date().toISOString().slice(0, 10),
+    tx_time: tx?.tx_time ?? "",
+    doc_no: tx?.doc_no ?? "",
+    description: tx?.description ?? "",
+    debit: tx ? String(tx.debit ?? 0) : "",
+    credit: tx ? String(tx.credit ?? 0) : "",
+    balance: tx?.balance != null ? String(tx.balance) : "",
+  };
+  const [form, setForm] = useState<TxForm>(initial);
+  const [key, setKey] = useState("");
+  const currentKey = `${open}-${tx?.id ?? "new"}`;
+  if (key !== currentKey) { setKey(currentKey); setForm(initial); }
 
-function Pagination({
-  page, pageSize, total, onChange,
-}: { page: number; pageSize: number; total: number; onChange: (p: number) => void }) {
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  if (totalPages <= 1) return null;
-  const nums: number[] = [];
-  const start = Math.max(1, page - 2);
-  const end = Math.min(totalPages, start + 4);
-  for (let i = start; i <= end; i++) nums.push(i);
-  const from = (page - 1) * pageSize + 1;
-  const to = Math.min(total, page * pageSize);
+  const set = (k: keyof TxForm, v: string) => setForm((p) => ({ ...p, [k]: v }));
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    if (!form.date || !form.description.trim()) { toast.error("Tarih ve açıklama zorunlu"); return; }
+    setBusy(true);
+    await onSave({
+      date: form.date,
+      tx_time: form.tx_time || null,
+      doc_no: form.doc_no || null,
+      description: form.description.trim(),
+      debit: Number(form.debit || 0),
+      credit: Number(form.credit || 0),
+      balance: form.balance === "" ? null : Number(form.balance),
+    });
+    setBusy(false);
+  };
+
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card p-3">
-      <div className="text-xs text-muted-foreground">
-        {from.toLocaleString("tr-TR")} – {to.toLocaleString("tr-TR")} / {total.toLocaleString("tr-TR")}
-      </div>
-      <div className="flex items-center gap-1">
-        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        {start > 1 && <span className="px-1 text-xs text-muted-foreground">…</span>}
-        {nums.map((n) => (
-          <Button key={n} variant={n === page ? "default" : "outline"} size="sm" onClick={() => onChange(n)}>
-            {n}
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>{tx ? "Hareketi Düzenle" : "Yeni Hareket"}</DialogTitle></DialogHeader>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-1.5"><Label>Tarih</Label>
+            <Input type="date" value={form.date} onChange={(e) => set("date", e.target.value)} /></div>
+          <div className="grid gap-1.5"><Label>Saat</Label>
+            <Input type="time" value={form.tx_time} onChange={(e) => set("tx_time", e.target.value)} /></div>
+          <div className="sm:col-span-2 grid gap-1.5"><Label>İşlem No</Label>
+            <Input value={form.doc_no} onChange={(e) => set("doc_no", e.target.value)} /></div>
+          <div className="sm:col-span-2 grid gap-1.5">
+            <Label>{layout === "vakifbank" ? "İşlem Adı" : "Açıklama"}</Label>
+            <Input value={form.description} onChange={(e) => set("description", e.target.value)} />
+          </div>
+          <div className="grid gap-1.5"><Label>Borç (çıkış)</Label>
+            <Input type="number" step="0.01" value={form.debit} onChange={(e) => set("debit", e.target.value)} /></div>
+          <div className="grid gap-1.5"><Label>Alacak (giriş)</Label>
+            <Input type="number" step="0.01" value={form.credit} onChange={(e) => set("credit", e.target.value)} /></div>
+          <div className="sm:col-span-2 grid gap-1.5"><Label>Bakiye</Label>
+            <Input type="number" step="0.01" value={form.balance} onChange={(e) => set("balance", e.target.value)} /></div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Vazgeç</Button>
+          <Button onClick={submit} disabled={busy}>
+            {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Kaydet
           </Button>
-        ))}
-        {end < totalPages && <span className="px-1 text-xs text-muted-foreground">…</span>}
-        <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
-
-function TxForm({
-  value, onChange, banks,
-}: { value: Form; onChange: (v: Form) => void; banks: { id: string; name: string }[] }) {
-  const set = (p: Partial<Form>) => onChange({ ...value, ...p });
-  return (
-    <div className="grid gap-3">
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <Label>Banka</Label>
-          <Select value={value.bankId} onValueChange={(v) => set({ bankId: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {banks.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label>Tarih</Label>
-          <Input type="date" value={value.date} onChange={(e) => set({ date: e.target.value })} />
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <Label>Tip</Label>
-          <Select value={value.type} onValueChange={(v) => set({ type: v as "in" | "out" })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="in">Gelen (Giriş)</SelectItem>
-              <SelectItem value="out">Giden (Çıkış)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label>Tutar</Label>
-          <Input type="number" value={value.amount} onChange={(e) => set({ amount: +e.target.value })} />
-        </div>
-      </div>
-      <div><Label>Ödeme Yapılan Firma / Açıklama</Label>
-        <Input value={value.description} onChange={(e) => set({ description: e.target.value })} /></div>
-      <div><Label>Kategori</Label>
-        <Input value={value.category} onChange={(e) => set({ category: e.target.value })} placeholder="İsteğe bağlı" /></div>
-    </div>
-  );
-}
-
-// suppress unused imports warning
-void Badge;
