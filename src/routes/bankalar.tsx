@@ -102,7 +102,7 @@ function Page() {
     <div className="space-y-6">
       <PageHeader
         title="Bankalar"
-        description="Banka hesaplarınızı yönetin, ekstre yükleyin ve tüm hareketleri görüntüleyin."
+        subtitle="Banka hesaplarınızı yönetin, ekstre yükleyin ve tüm hareketleri görüntüleyin."
         actions={
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={refresh}>
@@ -128,7 +128,7 @@ function Page() {
         <EmptyState
           icon={Landmark}
           title="Henüz banka yok"
-          description="Banka ekleyerek ekstre yüklemeye başlayın."
+          desc="Banka ekleyerek ekstre yüklemeye başlayın."
           action={<Button onClick={() => { setEditing(null); setFormOpen(true); }}><Plus className="mr-2 h-4 w-4" />Banka Ekle</Button>}
         />
       ) : (
