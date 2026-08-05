@@ -13,7 +13,7 @@ export async function extractPdfLines(
     (worker as { default: string }).default;
 
   const buf = await file.arrayBuffer();
-  const doc = await pdfjs.getDocument({ data: buf, isEvalSupported: false }).promise;
+  const doc = await pdfjs.getDocument({ data: buf }).promise;
   const lines: string[] = [];
 
   for (let p = 1; p <= doc.numPages; p++) {
@@ -48,6 +48,5 @@ export async function extractPdfLines(
   }
 
   const pages = doc.numPages;
-  await doc.destroy();
   return { lines, text: lines.join("\n"), pages };
 }
