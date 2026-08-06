@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  ArrowLeft, ArrowUpDown, Download, Landmark, Loader2, Plus, Trash2, Upload, X,
+  ArrowLeft, ArrowUpDown, Download, Landmark, Loader2, Pencil, Plus, Trash2, Upload, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { fmt } from "@/lib/mock-data";
@@ -25,7 +25,7 @@ import {
   fetchTransactions, statementUrl, updateTransaction, type StatementRow, type TxRow,
 } from "@/lib/banks/service";
 
-export const Route = createFileRoute("/bankalar/$id")({
+export const Route = createFileRoute("/bankalar_/$id")({
   head: () => ({
     meta: [
       { title: "Banka Hareketleri — Fintra" },
@@ -52,7 +52,7 @@ const EMPTY_F: Filters = {
 };
 
 function Page() {
-  const { id } = useParams({ from: "/bankalar/$id" });
+  const { id } = useParams({ from: "/bankalar_/$id" });
   const qc = useQueryClient();
 
   const banksQ = useQuery({ queryKey: ["banks"], queryFn: fetchBanks });
@@ -64,7 +64,7 @@ function Page() {
   const stQ = useQuery({ queryKey: ["bank-stmts", id], queryFn: () => fetchStatements(id), enabled: !!id });
 
   const [f, setF] = useState<Filters>(EMPTY_F);
-  const [asc, setAsc] = useState(true);
+  const [asc, setAsc] = useState(false);
   const [sel, setSel] = useState<string[]>([]);
   const [detail, setDetail] = useState<TxRow | null>(null);
   const [editing, setEditing] = useState<TxRow | null>(null);
@@ -92,10 +92,24 @@ function Page() {
     return asc ? out : [...out].reverse();
   }, [txQ.data, f, asc]);
 
-  const totals = useMemo(() => ({
-    inn: rows.reduce((a, t) => a + Number(t.credit || 0), 0),
-    out: rows.reduce((a, t) => a + Number(t.debit || 0), 0),
-  }), [rows]);
+  const totals = useMemo(() => {
+    const inn = rows.reduce((a, t) => a + Number(t.credit || 0), 0);
+    const out = rows.reduce((a, t) => a + Number(t.debit || 0), 0);
+    const all = txQ.data ?? [];
+    const lastWithBalance = [...all].reverse().find((t) => t.balance != null);
+    return { inn, out, count: rows.length, balance: Number(lastWithBalance?.balance ?? bank?.current_balance ?? 0) };
+  }, [rows, txQ.data, bank]);
+
+  const removeOne = async (t: TxRow) => {
+    if (!window.confirm("Bu hareket silinsin mi?")) return;
+    try {
+      await deleteTransactions([t.id]);
+      toast.success("Hareket silindi");
+      refresh();
+    } catch (e) {
+      toast.error("Silinemedi", { description: (e as Error).message });
+    }
+  };
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["bank-tx", id] });
@@ -166,6 +180,14 @@ function Page() {
           </Button>
         </div>
       </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <SumCard label="Toplam Hareket" value={String(totals.count)} />
+        <SumCard label="Toplam Giriş" value={fmt(totals.inn)} tone="text-emerald-500" />
+        <SumCard label="Toplam Çıkış" value={fmt(totals.out)} tone="text-rose-500" />
+        <SumCard label="Güncel Bakiye" value={fmt(totals.balance)} />
+      </div>
+
 
       <Card>
         <CardContent className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -267,7 +289,7 @@ function Page() {
                         {layout === "vakifbank" && <TableCell className="text-xs">{t.doc_no ?? "—"}</TableCell>}
                         <TableCell className="text-xs">
                           {t.description}
-                          {t.source === "Manuel" && <Badge variant="outline" className="ml-2 text-[10px]">Manuel</Badge>}
+                          {t.source && <Badge variant="outline" className="ml-2 text-[10px]">{t.source}</Badge>}
                         </TableCell>
                         {layout === "vakifbank" ? (
                           <TableCell className={`text-right tabular-nums ${amount < 0 ? "text-rose-500" : "text-emerald-500"}`}>
@@ -286,12 +308,15 @@ function Page() {
                         <TableCell className="text-right tabular-nums text-muted-foreground">
                           {t.balance != null ? fmt(Number(t.balance)) : "—"}
                         </TableCell>
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <Button size="icon" variant="ghost" onClick={() => setEditing(t)}>
-                            <Plus className="hidden" />
-                            <span className="text-xs">Düzenle</span>
+                        <TableCell className="whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+                          <Button size="icon" variant="ghost" title="Düzenle" onClick={() => setEditing(t)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" title="Sil" className="text-destructive" onClick={() => void removeOne(t)}>
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </TableCell>
+
                       </TableRow>
                     );
                   })}
@@ -473,5 +498,16 @@ function TxDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function SumCard({ label, value, tone }: { label: string; value: string; tone?: string }) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className={`font-semibold tabular-nums ${tone ?? ""}`}>{value}</p>
+      </CardContent>
+    </Card>
   );
 }
