@@ -289,7 +289,7 @@ function Page() {
                         {layout === "vakifbank" && <TableCell className="text-xs">{t.doc_no ?? "—"}</TableCell>}
                         <TableCell className="text-xs">
                           {t.description}
-                          {t.source === "Manuel" && <Badge variant="outline" className="ml-2 text-[10px]">Manuel</Badge>}
+                          {t.source && <Badge variant="outline" className="ml-2 text-[10px]">{t.source}</Badge>}
                         </TableCell>
                         {layout === "vakifbank" ? (
                           <TableCell className={`text-right tabular-nums ${amount < 0 ? "text-rose-500" : "text-emerald-500"}`}>
