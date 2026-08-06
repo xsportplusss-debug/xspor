@@ -181,6 +181,14 @@ function Page() {
         </div>
       </div>
 
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <SumCard label="Toplam Hareket" value={String(totals.count)} />
+        <SumCard label="Toplam Giriş" value={fmt(totals.inn)} tone="text-emerald-500" />
+        <SumCard label="Toplam Çıkış" value={fmt(totals.out)} tone="text-rose-500" />
+        <SumCard label="Güncel Bakiye" value={fmt(totals.balance)} />
+      </div>
+
+
       <Card>
         <CardContent className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="grid gap-1.5"><Label className="text-xs">Başlangıç</Label>
