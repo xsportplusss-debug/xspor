@@ -64,7 +64,7 @@ function Page() {
   const stQ = useQuery({ queryKey: ["bank-stmts", id], queryFn: () => fetchStatements(id), enabled: !!id });
 
   const [f, setF] = useState<Filters>(EMPTY_F);
-  const [asc, setAsc] = useState(true);
+  const [asc, setAsc] = useState(false);
   const [sel, setSel] = useState<string[]>([]);
   const [detail, setDetail] = useState<TxRow | null>(null);
   const [editing, setEditing] = useState<TxRow | null>(null);
