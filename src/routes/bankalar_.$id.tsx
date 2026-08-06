@@ -25,7 +25,7 @@ import {
   fetchTransactions, statementUrl, updateTransaction, type StatementRow, type TxRow,
 } from "@/lib/banks/service";
 
-export const Route = createFileRoute("/bankalar/$id")({
+export const Route = createFileRoute("/bankalar_/$id")({
   head: () => ({
     meta: [
       { title: "Banka Hareketleri — Fintra" },
@@ -52,7 +52,7 @@ const EMPTY_F: Filters = {
 };
 
 function Page() {
-  const { id } = useParams({ from: "/bankalar/$id" });
+  const { id } = useParams({ from: "/bankalar_/$id" });
   const qc = useQueryClient();
 
   const banksQ = useQuery({ queryKey: ["banks"], queryFn: fetchBanks });
