@@ -308,12 +308,15 @@ function Page() {
                         <TableCell className="text-right tabular-nums text-muted-foreground">
                           {t.balance != null ? fmt(Number(t.balance)) : "—"}
                         </TableCell>
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <Button size="icon" variant="ghost" onClick={() => setEditing(t)}>
-                            <Plus className="hidden" />
-                            <span className="text-xs">Düzenle</span>
+                        <TableCell className="whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+                          <Button size="icon" variant="ghost" title="Düzenle" onClick={() => setEditing(t)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" title="Sil" className="text-destructive" onClick={() => void removeOne(t)}>
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </TableCell>
+
                       </TableRow>
                     );
                   })}
