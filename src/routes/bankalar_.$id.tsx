@@ -92,10 +92,24 @@ function Page() {
     return asc ? out : [...out].reverse();
   }, [txQ.data, f, asc]);
 
-  const totals = useMemo(() => ({
-    inn: rows.reduce((a, t) => a + Number(t.credit || 0), 0),
-    out: rows.reduce((a, t) => a + Number(t.debit || 0), 0),
-  }), [rows]);
+  const totals = useMemo(() => {
+    const inn = rows.reduce((a, t) => a + Number(t.credit || 0), 0);
+    const out = rows.reduce((a, t) => a + Number(t.debit || 0), 0);
+    const all = txQ.data ?? [];
+    const lastWithBalance = [...all].reverse().find((t) => t.balance != null);
+    return { inn, out, count: rows.length, balance: Number(lastWithBalance?.balance ?? bank?.current_balance ?? 0) };
+  }, [rows, txQ.data, bank]);
+
+  const removeOne = async (t: TxRow) => {
+    if (!window.confirm("Bu hareket silinsin mi?")) return;
+    try {
+      await deleteTransactions([t.id]);
+      toast.success("Hareket silindi");
+      refresh();
+    } catch (e) {
+      toast.error("Silinemedi", { description: (e as Error).message });
+    }
+  };
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["bank-tx", id] });
