@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  ArrowLeft, ArrowUpDown, Download, Landmark, Loader2, Plus, Trash2, Upload, X,
+  ArrowLeft, ArrowUpDown, Download, Landmark, Loader2, Pencil, Plus, Trash2, Upload, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { fmt } from "@/lib/mock-data";
@@ -498,5 +498,16 @@ function TxDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function SumCard({ label, value, tone }: { label: string; value: string; tone?: string }) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className={`font-semibold tabular-nums ${tone ?? ""}`}>{value}</p>
+      </CardContent>
+    </Card>
   );
 }
