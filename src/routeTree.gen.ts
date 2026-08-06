@@ -38,7 +38,7 @@ import { Route as PazaryerleriCiceksepetiRouteImport } from './routes/pazaryerle
 import { Route as PazaryerleriAyarlarRouteImport } from './routes/pazaryerleri.ayarlar'
 import { Route as PazaryerleriAmazonRouteImport } from './routes/pazaryerleri.amazon'
 import { Route as KasaIdRouteImport } from './routes/kasa.$id'
-import { Route as BankalarIdRouteImport } from './routes/bankalar.$id'
+import { Route as BankalarIdRouteImport } from './routes/bankalar_.$id'
 import { Route as ApiPublicHooksDriveBackupRouteImport } from './routes/api/public/hooks/drive-backup'
 
 const UrunlerRoute = UrunlerRouteImport.update({
@@ -188,9 +188,9 @@ const KasaIdRoute = KasaIdRouteImport.update({
   getParentRoute: () => KasaRoute,
 } as any)
 const BankalarIdRoute = BankalarIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => BankalarRoute,
+  id: '/bankalar_/$id',
+  path: '/bankalar/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicHooksDriveBackupRoute =
   ApiPublicHooksDriveBackupRouteImport.update({
@@ -202,7 +202,7 @@ const ApiPublicHooksDriveBackupRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alis-faturalari': typeof AlisFaturalariRoute
-  '/bankalar': typeof BankalarRouteWithChildren
+  '/bankalar': typeof BankalarRoute
   '/bildirimler': typeof BildirimlerRoute
   '/cari-hesaplar': typeof CariHesaplarRoute
   '/e-arsiv': typeof EArsivRoute
@@ -235,7 +235,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alis-faturalari': typeof AlisFaturalariRoute
-  '/bankalar': typeof BankalarRouteWithChildren
+  '/bankalar': typeof BankalarRoute
   '/bildirimler': typeof BildirimlerRoute
   '/cari-hesaplar': typeof CariHesaplarRoute
   '/e-arsiv': typeof EArsivRoute
@@ -269,7 +269,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/alis-faturalari': typeof AlisFaturalariRoute
-  '/bankalar': typeof BankalarRouteWithChildren
+  '/bankalar': typeof BankalarRoute
   '/bildirimler': typeof BildirimlerRoute
   '/cari-hesaplar': typeof CariHesaplarRoute
   '/e-arsiv': typeof EArsivRoute
@@ -285,7 +285,7 @@ export interface FileRoutesById {
   '/satis-faturalari': typeof SatisFaturalariRoute
   '/takvim': typeof TakvimRoute
   '/urunler': typeof UrunlerRoute
-  '/bankalar/$id': typeof BankalarIdRoute
+  '/bankalar_/$id': typeof BankalarIdRoute
   '/kasa/$id': typeof KasaIdRoute
   '/pazaryerleri/amazon': typeof PazaryerleriAmazonRoute
   '/pazaryerleri/ayarlar': typeof PazaryerleriAyarlarRoute
@@ -386,7 +386,7 @@ export interface FileRouteTypes {
     | '/satis-faturalari'
     | '/takvim'
     | '/urunler'
-    | '/bankalar/$id'
+    | '/bankalar_/$id'
     | '/kasa/$id'
     | '/pazaryerleri/amazon'
     | '/pazaryerleri/ayarlar'
@@ -404,7 +404,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AlisFaturalariRoute: typeof AlisFaturalariRoute
-  BankalarRoute: typeof BankalarRouteWithChildren
+  BankalarRoute: typeof BankalarRoute
   BildirimlerRoute: typeof BildirimlerRoute
   CariHesaplarRoute: typeof CariHesaplarRoute
   EArsivRoute: typeof EArsivRoute
@@ -420,6 +420,7 @@ export interface RootRouteChildren {
   SatisFaturalariRoute: typeof SatisFaturalariRoute
   TakvimRoute: typeof TakvimRoute
   UrunlerRoute: typeof UrunlerRoute
+  BankalarIdRoute: typeof BankalarIdRoute
   PazaryerleriAmazonRoute: typeof PazaryerleriAmazonRoute
   PazaryerleriAyarlarRoute: typeof PazaryerleriAyarlarRoute
   PazaryerleriCiceksepetiRoute: typeof PazaryerleriCiceksepetiRoute
@@ -638,12 +639,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KasaIdRouteImport
       parentRoute: typeof KasaRoute
     }
-    '/bankalar/$id': {
-      id: '/bankalar/$id'
-      path: '/$id'
+    '/bankalar_/$id': {
+      id: '/bankalar_/$id'
+      path: '/bankalar/$id'
       fullPath: '/bankalar/$id'
       preLoaderRoute: typeof BankalarIdRouteImport
-      parentRoute: typeof BankalarRoute
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/drive-backup': {
       id: '/api/public/hooks/drive-backup'
@@ -654,18 +655,6 @@ declare module '@tanstack/react-router' {
     }
   }
 }
-
-interface BankalarRouteChildren {
-  BankalarIdRoute: typeof BankalarIdRoute
-}
-
-const BankalarRouteChildren: BankalarRouteChildren = {
-  BankalarIdRoute: BankalarIdRoute,
-}
-
-const BankalarRouteWithChildren = BankalarRoute._addFileChildren(
-  BankalarRouteChildren,
-)
 
 interface KasaRouteChildren {
   KasaIdRoute: typeof KasaIdRoute
@@ -680,7 +669,7 @@ const KasaRouteWithChildren = KasaRoute._addFileChildren(KasaRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlisFaturalariRoute: AlisFaturalariRoute,
-  BankalarRoute: BankalarRouteWithChildren,
+  BankalarRoute: BankalarRoute,
   BildirimlerRoute: BildirimlerRoute,
   CariHesaplarRoute: CariHesaplarRoute,
   EArsivRoute: EArsivRoute,
@@ -696,6 +685,7 @@ const rootRouteChildren: RootRouteChildren = {
   SatisFaturalariRoute: SatisFaturalariRoute,
   TakvimRoute: TakvimRoute,
   UrunlerRoute: UrunlerRoute,
+  BankalarIdRoute: BankalarIdRoute,
   PazaryerleriAmazonRoute: PazaryerleriAmazonRoute,
   PazaryerleriAyarlarRoute: PazaryerleriAyarlarRoute,
   PazaryerleriCiceksepetiRoute: PazaryerleriCiceksepetiRoute,
