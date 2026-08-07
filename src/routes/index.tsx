@@ -15,6 +15,8 @@ import {
 import { useMemo } from "react";
 import { fmtTL } from "@/lib/mock-data";
 import { useStore, bankBalance, cashBalance } from "@/lib/store";
+import { useQuery } from "@tanstack/react-query";
+import { fetchBankSummaries } from "@/lib/banks/service";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -60,6 +62,19 @@ function Dashboard() {
     return [...map.values()].sort((a, b) => (a.m < b.m ? -1 : 1));
   }, [bankTx, cashTx]);
 
+  const bankQ = useQuery({
+    queryKey: ["bank-summaries"],
+    queryFn: fetchBankSummaries,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
+  const bankSummaries = bankQ.data ?? [];
+  const bankTotals = useMemo(() => ({
+    balance: bankSummaries.reduce((a, b) => a + b.balance, 0),
+    inn: bankSummaries.reduce((a, b) => a + b.inn, 0),
+    out: bankSummaries.reduce((a, b) => a + b.out, 0),
+  }), [bankSummaries]);
+
   const lowStock = products.filter((p) => p.minStock > 0 && p.stock < p.minStock);
   const isEmpty = banks.length + cashes.length + salesInvoices.length + purchaseInvoices.length + products.length === 0;
 
@@ -95,6 +110,47 @@ function Dashboard() {
         <StatCard label="Pazar Yeri Net Kâr" value={fmtTL(marketplaceNet)} icon={Store} tone="success" />
       </div>
 
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label="Toplam Banka Bakiyesi" value={fmtTL(bankTotals.balance)} icon={Landmark} tone="success" hint={`${bankSummaries.length} hesap`} />
+        <StatCard label="Toplam Gelen Para" value={fmtTL(bankTotals.inn)} icon={ArrowUpRight} tone="info" />
+        <StatCard label="Toplam Giden Para" value={fmtTL(bankTotals.out)} icon={TrendingDown} tone="warning" />
+      </div>
+
+      {bankSummaries.length > 0 && (
+        <Card className="glass">
+          <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-base">Bankalara Göre Dağılım</CardTitle>
+            <Link to="/bankalar"><Button variant="ghost" size="sm">Bankalar</Button></Link>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Banka</TableHead>
+                    <TableHead className="text-right">Güncel Bakiye</TableHead>
+                    <TableHead className="text-right">Toplam Gelen</TableHead>
+                    <TableHead className="text-right">Toplam Giden</TableHead>
+                    <TableHead className="text-right">İşlem Sayısı</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {bankSummaries.map((b) => (
+                    <TableRow key={b.bank.id}>
+                      <TableCell className="font-medium">{b.bank.name}</TableCell>
+                      <TableCell className="text-right font-semibold">{fmtTL(b.balance)}</TableCell>
+                      <TableCell className="text-right text-emerald-500">{fmtTL(b.inn)}</TableCell>
+                      <TableCell className="text-right text-rose-500">{fmtTL(b.out)}</TableCell>
+                      <TableCell className="text-right">{b.count}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {isEmpty && (
         <Card className="glass border-dashed">

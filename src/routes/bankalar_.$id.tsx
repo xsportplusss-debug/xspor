@@ -115,6 +115,7 @@ function Page() {
     void qc.invalidateQueries({ queryKey: ["bank-tx", id] });
     void qc.invalidateQueries({ queryKey: ["bank-stmts", id] });
     void qc.invalidateQueries({ queryKey: ["bank-agg"] });
+    void qc.invalidateQueries({ queryKey: ["bank-summaries"] });
   };
 
   const removeSelected = async () => {
