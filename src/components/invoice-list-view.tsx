@@ -28,6 +28,7 @@ import { PageHeader } from "@/components/page-header";
 import { useSelection } from "@/hooks/use-selection";
 import { INVOICE_TEMPLATE_HEADERS, rowsToInvoices } from "@/lib/importers";
 import { useStore } from "@/lib/store";
+import { flushSync } from "@/lib/cloud-sync";
 
 type Kind = "sales" | "purchase";
 
@@ -45,8 +46,14 @@ type Props = {
   bulkRemove: (ids: string[]) => void;
 };
 
-const STATUS_SALES: InvoiceStatus[] = ["Ödeme Bekleniyor", "Tahsil Edildi", "Onaylı", "Taslak", "İptal"];
-const STATUS_PURCHASE: InvoiceStatus[] = ["Ödeme Yapılacak", "Ödendi", "Onaylı", "Taslak", "İptal"];
+const STATUS_SALES: InvoiceStatus[] = [
+  "Ödeme Bekleniyor", "Kısmi Tahsil Edildi", "Tahsil Edildi",
+  "Onaylandı", "Taslak", "Beklemede", "İptal Edildi",
+];
+const STATUS_PURCHASE: InvoiceStatus[] = [
+  "Ödeme Yapılacak", "Kısmi Ödendi", "Ödendi",
+  "Onaylandı", "Taslak", "Beklemede", "İptal Edildi",
+];
 
 const emptyForm = (prefix: string): Omit<Invoice, "id"> => ({
   no: `${prefix}-${Date.now().toString().slice(-6)}`,
@@ -96,12 +103,36 @@ export function InvoiceListView({
   const targetIds = sel.selectedIds.length ? sel.selectedIds : filtered.map((x) => x.id);
   const targetLabel = sel.selectedIds.length ? `Seçili (${sel.selectedIds.length})` : `Tümü (${filtered.length})`;
 
-  function setStatusAll(status: InvoiceStatus) {
-    if (!targetIds.length) return toast.error("Kayıt yok");
-    bulkUpdate(targetIds, { status });
-    toast.success(`${targetIds.length} kayıt → ${status}`);
-    sel.clear();
+  // Optimistic tek satır durum güncelleme + kalıcı kayıt (hata olursa geri al).
+  async function changeStatus(row: Invoice, status: InvoiceStatus) {
+    if (row.status === status) return;
+    const prev = row.status;
+    update(row.id, { status });
+    try {
+      await flushSync();
+      toast.success("Durum güncellendi");
+    } catch (e) {
+      console.error("durum kaydedilemedi", e);
+      update(row.id, { status: prev });
+      toast.error("Durum kaydedilemedi, eski hâline döndürüldü");
+    }
   }
+
+  async function setStatusAll(status: InvoiceStatus) {
+    if (!targetIds.length) return toast.error("Kayıt yok");
+    const prev = new Map(list.map((x) => [x.id, x.status]));
+    bulkUpdate(targetIds, { status });
+    sel.clear();
+    try {
+      await flushSync();
+      toast.success(`${targetIds.length} kayıt → ${status}`);
+    } catch (e) {
+      console.error("durum kaydedilemedi", e);
+      targetIds.forEach((id) => update(id, { status: prev.get(id)! }));
+      toast.error("Durumlar kaydedilemedi, eski hâline döndürüldü");
+    }
+  }
+
 
   return (
     <div className="space-y-6">
@@ -204,10 +235,12 @@ export function InvoiceListView({
                       <TableCell className="text-right">{s.discount ? fmtTL(s.discount) : "—"}</TableCell>
                       <TableCell className="text-right font-semibold">{fmtTL(s.total)}</TableCell>
                       <TableCell>
-                        <Select value={s.status} onValueChange={(v) => update(s.id, { status: v as InvoiceStatus })}>
+                        <Select value={s.status} onValueChange={(v) => void changeStatus(s, v as InvoiceStatus)}>
                           <SelectTrigger className="h-7 w-[160px] text-xs"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            {statuses.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
+                            {(statuses.includes(s.status) ? statuses : [...statuses, s.status])
+                              .map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
+
                           </SelectContent>
                         </Select>
                       </TableCell>
