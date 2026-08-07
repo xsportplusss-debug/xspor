@@ -45,8 +45,14 @@ type Props = {
   bulkRemove: (ids: string[]) => void;
 };
 
-const STATUS_SALES: InvoiceStatus[] = ["Ödeme Bekleniyor", "Tahsil Edildi", "Onaylı", "Taslak", "İptal"];
-const STATUS_PURCHASE: InvoiceStatus[] = ["Ödeme Yapılacak", "Ödendi", "Onaylı", "Taslak", "İptal"];
+const STATUS_SALES: InvoiceStatus[] = [
+  "Ödeme Bekleniyor", "Kısmi Tahsil Edildi", "Tahsil Edildi",
+  "Onaylandı", "Taslak", "Beklemede", "İptal Edildi",
+];
+const STATUS_PURCHASE: InvoiceStatus[] = [
+  "Ödeme Yapılacak", "Kısmi Ödendi", "Ödendi",
+  "Onaylandı", "Taslak", "Beklemede", "İptal Edildi",
+];
 
 const emptyForm = (prefix: string): Omit<Invoice, "id"> => ({
   no: `${prefix}-${Date.now().toString().slice(-6)}`,
