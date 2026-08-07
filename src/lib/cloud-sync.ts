@@ -38,29 +38,58 @@ function isEmpty(data: Record<string, unknown>) {
   });
 }
 
-async function push() {
-  if (!currentUserId || !hydrated || saving) return;
-  saving = true;
-  try {
-    const payload = {
-      user_id: currentUserId,
-      data: snapshotData() as never,
-      company: snapshotCompany() as never,
-      updated_at: new Date().toISOString(),
-    };
-    await supabase.from("user_data").upsert(payload, { onConflict: "user_id" });
-  } catch (e) {
-    console.error("cloud sync push failed", e);
-  } finally {
-    saving = false;
+let dirty = false;
+let inflight: Promise<void> | null = null;
+
+async function push(): Promise<void> {
+  if (!currentUserId || !hydrated) return;
+  if (saving) {
+    // A push is already running; mark dirty so it runs again with fresh data.
+    dirty = true;
+    return inflight ?? undefined;
   }
+  saving = true;
+  dirty = false;
+  const run = (async () => {
+    try {
+      const payload = {
+        user_id: currentUserId!,
+        data: snapshotData() as never,
+        company: snapshotCompany() as never,
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = await supabase.from("user_data").upsert(payload, { onConflict: "user_id" });
+      if (error) throw error;
+    } catch (e) {
+      console.error("cloud sync push failed", e);
+      dirty = true;
+      throw e;
+    } finally {
+      saving = false;
+      inflight = null;
+    }
+    if (dirty) await push();
+  })();
+  inflight = run.catch(() => {});
+  return run;
+}
+
+/** Persist pending changes right now and resolve when the write completed. */
+export async function flushSync(): Promise<void> {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  await push();
 }
 
 function schedulePush() {
   if (!hydrated) return;
+  dirty = true;
   if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(push, 800);
+  saveTimer = setTimeout(() => { saveTimer = null; void push(); }, 800);
 }
+
 
 export async function loadFromCloud(userId: string) {
   currentUserId = userId;
