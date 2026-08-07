@@ -3,9 +3,9 @@
 // yönetilir ve tarayıcıda `localStorage`'a kalıcılaştırılır.
 
 export type InvoiceStatus =
-  | "Onaylı" | "Taslak" | "İptal"
-  | "Tahsil Edildi" | "Ödeme Bekleniyor"
-  | "Ödendi" | "Ödeme Yapılacak";
+  | "Onaylı" | "Onaylandı" | "Taslak" | "İptal" | "İptal Edildi" | "Beklemede"
+  | "Tahsil Edildi" | "Kısmi Tahsil Edildi" | "Ödeme Bekleniyor"
+  | "Ödendi" | "Kısmi Ödendi" | "Ödeme Yapılacak";
 
 export type Invoice = {
   id: string;
