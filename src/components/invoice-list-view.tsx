@@ -238,7 +238,9 @@ export function InvoiceListView({
                         <Select value={s.status} onValueChange={(v) => void changeStatus(s, v as InvoiceStatus)}>
                           <SelectTrigger className="h-7 w-[160px] text-xs"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            {statuses.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
+                            {(statuses.includes(s.status) ? statuses : [...statuses, s.status])
+                              .map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
+
                           </SelectContent>
                         </Select>
                       </TableCell>
