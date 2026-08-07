@@ -235,7 +235,7 @@ export function InvoiceListView({
                       <TableCell className="text-right">{s.discount ? fmtTL(s.discount) : "—"}</TableCell>
                       <TableCell className="text-right font-semibold">{fmtTL(s.total)}</TableCell>
                       <TableCell>
-                        <Select value={s.status} onValueChange={(v) => update(s.id, { status: v as InvoiceStatus })}>
+                        <Select value={s.status} onValueChange={(v) => void changeStatus(s, v as InvoiceStatus)}>
                           <SelectTrigger className="h-7 w-[160px] text-xs"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {statuses.map((st) => <SelectItem key={st} value={st}>{st}</SelectItem>)}
