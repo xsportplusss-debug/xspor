@@ -362,7 +362,7 @@ export async function commitImport(opts: {
     .from("banks")
     .update({
       last_statement_date: periodEnd,
-      current_balance: fresh[fresh.length - 1]?.balance ?? bank.current_balance,
+      current_balance: payload.length ? payload[payload.length - 1].balance : bank.current_balance,
       updated_at: new Date().toISOString(),
     })
     .eq("id", bank.id);
@@ -377,4 +377,48 @@ export async function commitImport(opts: {
   });
 
   return { imported, duplicates: duplicates + report.duplicatesInFile, statementId };
+}
+
+/* ---------- Özet (dashboard) ---------- */
+
+export type BankSummary = {
+  bank: BankRow;
+  count: number;
+  inn: number;
+  out: number;
+  balance: number;
+};
+
+/** Tüm bankaların canlı bakiye/giriş/çıkış/işlem sayısı özeti. */
+export async function fetchBankSummaries(): Promise<BankSummary[]> {
+  const banks = await fetchBanks();
+  const { data, error } = await supabase
+    .from("bank_transactions")
+    .select("bank_id,debit,credit,balance,date,pdf_order")
+    .is("deleted_at", null)
+    .order("date", { ascending: true })
+    .order("pdf_order", { ascending: true })
+    .limit(50000);
+  if (error) throw error;
+
+  const map = new Map<string, { count: number; inn: number; out: number; balance: number | null }>();
+  for (const r of (data ?? []) as { bank_id: string; debit: number; credit: number; balance: number | null }[]) {
+    const a = map.get(r.bank_id) ?? { count: 0, inn: 0, out: 0, balance: null };
+    a.count++;
+    a.inn += Number(r.credit || 0);
+    a.out += Number(r.debit || 0);
+    if (r.balance != null) a.balance = Number(r.balance);
+    map.set(r.bank_id, a);
+  }
+
+  return banks.map((bank) => {
+    const a = map.get(bank.id);
+    return {
+      bank,
+      count: a?.count ?? 0,
+      inn: a?.inn ?? 0,
+      out: a?.out ?? 0,
+      balance: Number(a?.balance ?? bank.current_balance ?? 0),
+    };
+  });
 }
