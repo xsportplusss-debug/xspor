@@ -163,14 +163,31 @@ export type TxInput = {
   balance?: number | null;
 };
 
+/** O gün içindeki son satır sırası (manuel kayıt günün sonuna eklenir). */
+async function nextOrder(bankId: string, date: string): Promise<number> {
+  const { data } = await supabase
+    .from("bank_transactions")
+    .select("pdf_order")
+    .eq("bank_id", bankId)
+    .eq("date", date)
+    .is("deleted_at", null)
+    .order("pdf_order", { ascending: false })
+    .limit(1);
+  const top = (data?.[0] as { pdf_order?: number } | undefined)?.pdf_order ?? 0;
+  return Number(top) + 1;
+}
+
 export async function addTransaction(bankId: string, input: TxInput): Promise<TxRow> {
   const user_id = await uid();
+  const pdf_order = await nextOrder(bankId, input.date);
   const { data, error } = await supabase
     .from("bank_transactions")
     .insert({
       user_id,
       bank_id: bankId,
       date: input.date,
+      pdf_order,
+
       tx_time: input.tx_time || null,
       doc_no: input.doc_no || null,
       description: input.description,
