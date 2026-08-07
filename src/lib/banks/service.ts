@@ -34,6 +34,7 @@ export type TxRow = {
   file_name: string | null;
   source: string;
   statement_date: string | null;
+  pdf_order: number;
   imported_at: string;
   created_at: string;
 };
@@ -54,7 +55,7 @@ export type StatementRow = {
 };
 
 const TX_COLS =
-  "id,bank_id,statement_id,date,tx_time,doc_no,description,debit,credit,balance,currency,file_name,source,statement_date,imported_at,created_at";
+  "id,bank_id,statement_id,date,tx_time,doc_no,description,debit,credit,balance,currency,file_name,source,statement_date,pdf_order,imported_at,created_at";
 
 const BANK_COLS =
   "id,name,bank_code,logo_url,iban,account_name,account_no,branch,currency,current_balance,last_statement_date,active,created_at";
@@ -139,7 +140,7 @@ export async function fetchTransactions(bankId: string, statementId?: string): P
       .eq("bank_id", bankId)
       .is("deleted_at", null)
       .order("date", { ascending: true })
-      .order("tx_time", { ascending: true, nullsFirst: true })
+      .order("pdf_order", { ascending: true })
       .order("created_at", { ascending: true })
       .range(from, from + page - 1);
     if (statementId) q = q.eq("statement_id", statementId);
