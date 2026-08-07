@@ -28,6 +28,7 @@ import { PageHeader } from "@/components/page-header";
 import { useSelection } from "@/hooks/use-selection";
 import { INVOICE_TEMPLATE_HEADERS, rowsToInvoices } from "@/lib/importers";
 import { useStore } from "@/lib/store";
+import { flushSync } from "@/lib/cloud-sync";
 
 type Kind = "sales" | "purchase";
 
