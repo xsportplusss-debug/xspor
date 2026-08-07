@@ -310,26 +310,40 @@ export async function commitImport(opts: {
   const statementId = (stmt as { id: string }).id;
 
   const source = /\.pdf$/i.test(file.name) ? "PDF" : /\.csv$/i.test(file.name) ? "CSV" : "Excel";
-  const payload = fresh.map((r) => ({
-    user_id,
-    bank_id: bank.id,
-    statement_id: statementId,
-    date: r.date,
-    tx_time: r.time ?? null,
-    doc_no: r.txNo ?? null,
-    ref_no: r.txNo ?? null,
-    description: r.description,
-    debit: r.amount < 0 ? -r.amount : 0,
-    credit: r.amount > 0 ? r.amount : 0,
-    balance: r.balance ?? null,
-    currency: r.currency ?? bank.currency ?? "TRY",
-    file_name: file.name,
-    statement_date: periodEnd,
-    source,
-    direction: r.amount >= 0 ? "in" : "out",
-    raw: (r.raw ?? null) as never,
-    dedup_key: txKey(r),
-  }));
+
+  // Satır satır bakiye: ekstrede bakiye varsa o kullanılır, yoksa bir önceki
+  // satırın bakiyesi + alacak − borç ile hesaplanır. Sıra asla değişmez.
+  const firstWithBalance = fresh.find((r) => r.balance != null);
+  let running =
+    firstWithBalance?.balance != null
+      ? Number(firstWithBalance.balance) - Number(firstWithBalance.amount)
+      : Number(bank.current_balance ?? 0);
+
+  const payload = fresh.map((r, i) => {
+    running = r.balance != null ? Number(r.balance) : running + Number(r.amount);
+    return {
+      user_id,
+      bank_id: bank.id,
+      statement_id: statementId,
+      date: r.date,
+      pdf_order: r.order ?? i + 1,
+      tx_time: r.time ?? null,
+      doc_no: r.txNo ?? null,
+      ref_no: r.txNo ?? null,
+      description: r.description,
+      debit: r.amount < 0 ? -r.amount : 0,
+      credit: r.amount > 0 ? r.amount : 0,
+      balance: running,
+      currency: r.currency ?? bank.currency ?? "TRY",
+      file_name: file.name,
+      statement_date: periodEnd,
+      source,
+      direction: r.amount >= 0 ? "in" : "out",
+      raw: (r.raw ?? null) as never,
+      dedup_key: txKey(r),
+    };
+  });
+
 
   let imported = 0;
   for (let i = 0; i < payload.length; i += 400) {
