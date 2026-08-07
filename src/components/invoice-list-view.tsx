@@ -102,12 +102,36 @@ export function InvoiceListView({
   const targetIds = sel.selectedIds.length ? sel.selectedIds : filtered.map((x) => x.id);
   const targetLabel = sel.selectedIds.length ? `Seçili (${sel.selectedIds.length})` : `Tümü (${filtered.length})`;
 
-  function setStatusAll(status: InvoiceStatus) {
-    if (!targetIds.length) return toast.error("Kayıt yok");
-    bulkUpdate(targetIds, { status });
-    toast.success(`${targetIds.length} kayıt → ${status}`);
-    sel.clear();
+  // Optimistic tek satır durum güncelleme + kalıcı kayıt (hata olursa geri al).
+  async function changeStatus(row: Invoice, status: InvoiceStatus) {
+    if (row.status === status) return;
+    const prev = row.status;
+    update(row.id, { status });
+    try {
+      await flushSync();
+      toast.success("Durum güncellendi");
+    } catch (e) {
+      console.error("durum kaydedilemedi", e);
+      update(row.id, { status: prev });
+      toast.error("Durum kaydedilemedi, eski hâline döndürüldü");
+    }
   }
+
+  async function setStatusAll(status: InvoiceStatus) {
+    if (!targetIds.length) return toast.error("Kayıt yok");
+    const prev = new Map(list.map((x) => [x.id, x.status]));
+    bulkUpdate(targetIds, { status });
+    sel.clear();
+    try {
+      await flushSync();
+      toast.success(`${targetIds.length} kayıt → ${status}`);
+    } catch (e) {
+      console.error("durum kaydedilemedi", e);
+      targetIds.forEach((id) => update(id, { status: prev.get(id)! }));
+      toast.error("Durumlar kaydedilemedi, eski hâline döndürüldü");
+    }
+  }
+
 
   return (
     <div className="space-y-6">
