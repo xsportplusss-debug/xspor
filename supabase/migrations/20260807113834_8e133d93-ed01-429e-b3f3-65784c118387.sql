@@ -1,0 +1,2 @@
+ALTER TABLE public.bank_transactions ADD COLUMN IF NOT EXISTS pdf_order integer NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS bank_transactions_order_idx ON public.bank_transactions (user_id, bank_id, date, pdf_order);
