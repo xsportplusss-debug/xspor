@@ -5,6 +5,8 @@
 export type StdTx = {
   date: string;              // ISO YYYY-MM-DD
   time?: string;             // HH:MM
+  /** Ekstredeki (PDF/tablo) gerçek satır sırası — asla değiştirilmez. */
+  order?: number;
   txNo?: string;             // İşlem / dekont no
   description: string;
   amount: number;            // + giriş, - çıkış

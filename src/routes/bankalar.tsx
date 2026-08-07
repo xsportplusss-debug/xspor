@@ -84,6 +84,7 @@ function Page() {
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["banks"] });
     void qc.invalidateQueries({ queryKey: ["bank-agg"] });
+    void qc.invalidateQueries({ queryKey: ["bank-summaries"] });
   };
 
   const doDelete = async () => {

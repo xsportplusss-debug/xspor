@@ -142,11 +142,17 @@ export async function parseForBank(
 
   const totalRead = result.totalRead;
   const { rows, skipped } = dedupeWithin(result.transactions);
-  rows.sort((a, b) => (a.date === b.date ? (a.time ?? "").localeCompare(b.time ?? "") : a.date.localeCompare(b.date)));
+
+  // Ekstredeki satır sırası korunur: yalnızca tarih bazında kararlı (stable)
+  // sıralama yapılır, aynı gün içindeki satırların dosyadaki sırası bozulmaz.
+  const withIndex = rows.map((r, i) => ({ r, i }));
+  withIndex.sort((a, b) => (a.r.date === b.r.date ? a.i - b.i : a.r.date.localeCompare(b.r.date)));
+  const ordered = withIndex.map(({ r }, i) => ({ ...r, order: i + 1 }));
 
   return {
     ...result,
-    transactions: rows,
+    transactions: ordered,
+
     totalRead,
     skipped,
     duplicatesInFile: skipped,

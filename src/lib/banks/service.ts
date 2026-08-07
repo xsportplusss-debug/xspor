@@ -34,6 +34,7 @@ export type TxRow = {
   file_name: string | null;
   source: string;
   statement_date: string | null;
+  pdf_order: number;
   imported_at: string;
   created_at: string;
 };
@@ -54,7 +55,7 @@ export type StatementRow = {
 };
 
 const TX_COLS =
-  "id,bank_id,statement_id,date,tx_time,doc_no,description,debit,credit,balance,currency,file_name,source,statement_date,imported_at,created_at";
+  "id,bank_id,statement_id,date,tx_time,doc_no,description,debit,credit,balance,currency,file_name,source,statement_date,pdf_order,imported_at,created_at";
 
 const BANK_COLS =
   "id,name,bank_code,logo_url,iban,account_name,account_no,branch,currency,current_balance,last_statement_date,active,created_at";
@@ -139,7 +140,7 @@ export async function fetchTransactions(bankId: string, statementId?: string): P
       .eq("bank_id", bankId)
       .is("deleted_at", null)
       .order("date", { ascending: true })
-      .order("tx_time", { ascending: true, nullsFirst: true })
+      .order("pdf_order", { ascending: true })
       .order("created_at", { ascending: true })
       .range(from, from + page - 1);
     if (statementId) q = q.eq("statement_id", statementId);
@@ -162,14 +163,31 @@ export type TxInput = {
   balance?: number | null;
 };
 
+/** O gün içindeki son satır sırası (manuel kayıt günün sonuna eklenir). */
+async function nextOrder(bankId: string, date: string): Promise<number> {
+  const { data } = await supabase
+    .from("bank_transactions")
+    .select("pdf_order")
+    .eq("bank_id", bankId)
+    .eq("date", date)
+    .is("deleted_at", null)
+    .order("pdf_order", { ascending: false })
+    .limit(1);
+  const top = (data?.[0] as { pdf_order?: number } | undefined)?.pdf_order ?? 0;
+  return Number(top) + 1;
+}
+
 export async function addTransaction(bankId: string, input: TxInput): Promise<TxRow> {
   const user_id = await uid();
+  const pdf_order = await nextOrder(bankId, input.date);
   const { data, error } = await supabase
     .from("bank_transactions")
     .insert({
       user_id,
       bank_id: bankId,
       date: input.date,
+      pdf_order,
+
       tx_time: input.tx_time || null,
       doc_no: input.doc_no || null,
       description: input.description,
@@ -292,26 +310,40 @@ export async function commitImport(opts: {
   const statementId = (stmt as { id: string }).id;
 
   const source = /\.pdf$/i.test(file.name) ? "PDF" : /\.csv$/i.test(file.name) ? "CSV" : "Excel";
-  const payload = fresh.map((r) => ({
-    user_id,
-    bank_id: bank.id,
-    statement_id: statementId,
-    date: r.date,
-    tx_time: r.time ?? null,
-    doc_no: r.txNo ?? null,
-    ref_no: r.txNo ?? null,
-    description: r.description,
-    debit: r.amount < 0 ? -r.amount : 0,
-    credit: r.amount > 0 ? r.amount : 0,
-    balance: r.balance ?? null,
-    currency: r.currency ?? bank.currency ?? "TRY",
-    file_name: file.name,
-    statement_date: periodEnd,
-    source,
-    direction: r.amount >= 0 ? "in" : "out",
-    raw: (r.raw ?? null) as never,
-    dedup_key: txKey(r),
-  }));
+
+  // Satır satır bakiye: ekstrede bakiye varsa o kullanılır, yoksa bir önceki
+  // satırın bakiyesi + alacak − borç ile hesaplanır. Sıra asla değişmez.
+  const firstWithBalance = fresh.find((r) => r.balance != null);
+  let running =
+    firstWithBalance?.balance != null
+      ? Number(firstWithBalance.balance) - Number(firstWithBalance.amount)
+      : Number(bank.current_balance ?? 0);
+
+  const payload = fresh.map((r, i) => {
+    running = r.balance != null ? Number(r.balance) : running + Number(r.amount);
+    return {
+      user_id,
+      bank_id: bank.id,
+      statement_id: statementId,
+      date: r.date,
+      pdf_order: r.order ?? i + 1,
+      tx_time: r.time ?? null,
+      doc_no: r.txNo ?? null,
+      ref_no: r.txNo ?? null,
+      description: r.description,
+      debit: r.amount < 0 ? -r.amount : 0,
+      credit: r.amount > 0 ? r.amount : 0,
+      balance: running,
+      currency: r.currency ?? bank.currency ?? "TRY",
+      file_name: file.name,
+      statement_date: periodEnd,
+      source,
+      direction: r.amount >= 0 ? "in" : "out",
+      raw: (r.raw ?? null) as never,
+      dedup_key: txKey(r),
+    };
+  });
+
 
   let imported = 0;
   for (let i = 0; i < payload.length; i += 400) {
@@ -330,7 +362,7 @@ export async function commitImport(opts: {
     .from("banks")
     .update({
       last_statement_date: periodEnd,
-      current_balance: fresh[fresh.length - 1]?.balance ?? bank.current_balance,
+      current_balance: payload.length ? payload[payload.length - 1].balance : bank.current_balance,
       updated_at: new Date().toISOString(),
     })
     .eq("id", bank.id);
@@ -345,4 +377,48 @@ export async function commitImport(opts: {
   });
 
   return { imported, duplicates: duplicates + report.duplicatesInFile, statementId };
+}
+
+/* ---------- Özet (dashboard) ---------- */
+
+export type BankSummary = {
+  bank: BankRow;
+  count: number;
+  inn: number;
+  out: number;
+  balance: number;
+};
+
+/** Tüm bankaların canlı bakiye/giriş/çıkış/işlem sayısı özeti. */
+export async function fetchBankSummaries(): Promise<BankSummary[]> {
+  const banks = await fetchBanks();
+  const { data, error } = await supabase
+    .from("bank_transactions")
+    .select("bank_id,debit,credit,balance,date,pdf_order")
+    .is("deleted_at", null)
+    .order("date", { ascending: true })
+    .order("pdf_order", { ascending: true })
+    .limit(50000);
+  if (error) throw error;
+
+  const map = new Map<string, { count: number; inn: number; out: number; balance: number | null }>();
+  for (const r of (data ?? []) as { bank_id: string; debit: number; credit: number; balance: number | null }[]) {
+    const a = map.get(r.bank_id) ?? { count: 0, inn: 0, out: 0, balance: null };
+    a.count++;
+    a.inn += Number(r.credit || 0);
+    a.out += Number(r.debit || 0);
+    if (r.balance != null) a.balance = Number(r.balance);
+    map.set(r.bank_id, a);
+  }
+
+  return banks.map((bank) => {
+    const a = map.get(bank.id);
+    return {
+      bank,
+      count: a?.count ?? 0,
+      inn: a?.inn ?? 0,
+      out: a?.out ?? 0,
+      balance: Number(a?.balance ?? bank.current_balance ?? 0),
+    };
+  });
 }

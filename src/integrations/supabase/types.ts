@@ -308,6 +308,7 @@ export type Database = {
           matched_invoice_id: string | null
           note: string | null
           operation: string | null
+          pdf_order: number
           raw: Json | null
           ref_no: string | null
           source: string
@@ -344,6 +345,7 @@ export type Database = {
           matched_invoice_id?: string | null
           note?: string | null
           operation?: string | null
+          pdf_order?: number
           raw?: Json | null
           ref_no?: string | null
           source?: string
@@ -380,6 +382,7 @@ export type Database = {
           matched_invoice_id?: string | null
           note?: string | null
           operation?: string | null
+          pdf_order?: number
           raw?: Json | null
           ref_no?: string | null
           source?: string
