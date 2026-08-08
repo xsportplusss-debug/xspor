@@ -17,6 +17,9 @@ const DATA_KEYS = [
   "bankTx",
   "cashRegisters",
   "cashTx",
+  "marketplaceConfigs",
+  "marketplaceOrders",
+  "eInvoiceConfig",
 ] as const;
 
 function snapshotData() {
@@ -33,8 +36,11 @@ function snapshotCompany() {
 
 function isEmpty(data: Record<string, unknown>) {
   return DATA_KEYS.every((k) => {
-    const v = data[k] as unknown[] | undefined;
-    return !v || v.length === 0;
+    const v = data[k];
+    if (v == null) return true;
+    if (Array.isArray(v)) return v.length === 0;
+    if (typeof v === "object") return Object.keys(v as object).length === 0;
+    return false;
   });
 }
 
