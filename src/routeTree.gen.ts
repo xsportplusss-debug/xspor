@@ -27,6 +27,7 @@ import { Route as BildirimlerRouteImport } from './routes/bildirimler'
 import { Route as BankalarRouteImport } from './routes/bankalar'
 import { Route as AlisFaturalariRouteImport } from './routes/alis-faturalari'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PazaryerleriIndexRouteImport } from './routes/pazaryerleri.index'
 import { Route as PazaryerleriTurkcellPasajRouteImport } from './routes/pazaryerleri.turkcell-pasaj'
 import { Route as PazaryerleriTrendyolRouteImport } from './routes/pazaryerleri.trendyol'
 import { Route as PazaryerleriPttavmRouteImport } from './routes/pazaryerleri.pttavm'
@@ -131,6 +132,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PazaryerleriIndexRoute = PazaryerleriIndexRouteImport.update({
+  id: '/pazaryerleri/',
+  path: '/pazaryerleri/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PazaryerleriTurkcellPasajRoute =
   PazaryerleriTurkcellPasajRouteImport.update({
     id: '/pazaryerleri/turkcell-pasaj',
@@ -230,6 +236,7 @@ export interface FileRoutesByFullPath {
   '/pazaryerleri/pttavm': typeof PazaryerleriPttavmRoute
   '/pazaryerleri/trendyol': typeof PazaryerleriTrendyolRoute
   '/pazaryerleri/turkcell-pasaj': typeof PazaryerleriTurkcellPasajRoute
+  '/pazaryerleri/': typeof PazaryerleriIndexRoute
   '/api/public/hooks/drive-backup': typeof ApiPublicHooksDriveBackupRoute
 }
 export interface FileRoutesByTo {
@@ -263,6 +270,7 @@ export interface FileRoutesByTo {
   '/pazaryerleri/pttavm': typeof PazaryerleriPttavmRoute
   '/pazaryerleri/trendyol': typeof PazaryerleriTrendyolRoute
   '/pazaryerleri/turkcell-pasaj': typeof PazaryerleriTurkcellPasajRoute
+  '/pazaryerleri': typeof PazaryerleriIndexRoute
   '/api/public/hooks/drive-backup': typeof ApiPublicHooksDriveBackupRoute
 }
 export interface FileRoutesById {
@@ -297,6 +305,7 @@ export interface FileRoutesById {
   '/pazaryerleri/pttavm': typeof PazaryerleriPttavmRoute
   '/pazaryerleri/trendyol': typeof PazaryerleriTrendyolRoute
   '/pazaryerleri/turkcell-pasaj': typeof PazaryerleriTurkcellPasajRoute
+  '/pazaryerleri/': typeof PazaryerleriIndexRoute
   '/api/public/hooks/drive-backup': typeof ApiPublicHooksDriveBackupRoute
 }
 export interface FileRouteTypes {
@@ -332,6 +341,7 @@ export interface FileRouteTypes {
     | '/pazaryerleri/pttavm'
     | '/pazaryerleri/trendyol'
     | '/pazaryerleri/turkcell-pasaj'
+    | '/pazaryerleri/'
     | '/api/public/hooks/drive-backup'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -365,6 +375,7 @@ export interface FileRouteTypes {
     | '/pazaryerleri/pttavm'
     | '/pazaryerleri/trendyol'
     | '/pazaryerleri/turkcell-pasaj'
+    | '/pazaryerleri'
     | '/api/public/hooks/drive-backup'
   id:
     | '__root__'
@@ -398,6 +409,7 @@ export interface FileRouteTypes {
     | '/pazaryerleri/pttavm'
     | '/pazaryerleri/trendyol'
     | '/pazaryerleri/turkcell-pasaj'
+    | '/pazaryerleri/'
     | '/api/public/hooks/drive-backup'
   fileRoutesById: FileRoutesById
 }
@@ -431,6 +443,7 @@ export interface RootRouteChildren {
   PazaryerleriPttavmRoute: typeof PazaryerleriPttavmRoute
   PazaryerleriTrendyolRoute: typeof PazaryerleriTrendyolRoute
   PazaryerleriTurkcellPasajRoute: typeof PazaryerleriTurkcellPasajRoute
+  PazaryerleriIndexRoute: typeof PazaryerleriIndexRoute
   ApiPublicHooksDriveBackupRoute: typeof ApiPublicHooksDriveBackupRoute
 }
 
@@ -560,6 +573,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pazaryerleri/': {
+      id: '/pazaryerleri/'
+      path: '/pazaryerleri'
+      fullPath: '/pazaryerleri/'
+      preLoaderRoute: typeof PazaryerleriIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pazaryerleri/turkcell-pasaj': {
@@ -696,18 +716,9 @@ const rootRouteChildren: RootRouteChildren = {
   PazaryerleriPttavmRoute: PazaryerleriPttavmRoute,
   PazaryerleriTrendyolRoute: PazaryerleriTrendyolRoute,
   PazaryerleriTurkcellPasajRoute: PazaryerleriTurkcellPasajRoute,
+  PazaryerleriIndexRoute: PazaryerleriIndexRoute,
   ApiPublicHooksDriveBackupRoute: ApiPublicHooksDriveBackupRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
