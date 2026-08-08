@@ -69,6 +69,7 @@ const financeItems = [
 ];
 
 const marketplaceItems = [
+  { title: "Tüm Pazaryerleri", url: "/pazaryerleri" },
   { title: "API Ayarları", url: "/pazaryerleri/ayarlar" },
   { title: "Trendyol", url: "/pazaryerleri/trendyol" },
   { title: "Hepsiburada", url: "/pazaryerleri/hepsiburada" },
