@@ -38,6 +38,7 @@ import { Route as PazaryerleriHepsiburadaRouteImport } from './routes/pazaryerle
 import { Route as PazaryerleriCiceksepetiRouteImport } from './routes/pazaryerleri.ciceksepeti'
 import { Route as PazaryerleriAyarlarRouteImport } from './routes/pazaryerleri.ayarlar'
 import { Route as PazaryerleriAmazonRouteImport } from './routes/pazaryerleri.amazon'
+import { Route as PazaryerleriIdRouteImport } from './routes/pazaryerleri.$id'
 import { Route as KasaIdRouteImport } from './routes/kasa.$id'
 import { Route as BankalarIdRouteImport } from './routes/bankalar_.$id'
 import { Route as ApiPublicHooksDriveBackupRouteImport } from './routes/api/public/hooks/drive-backup'
@@ -188,6 +189,11 @@ const PazaryerleriAmazonRoute = PazaryerleriAmazonRouteImport.update({
   path: '/pazaryerleri/amazon',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PazaryerleriIdRoute = PazaryerleriIdRouteImport.update({
+  id: '/pazaryerleri/$id',
+  path: '/pazaryerleri/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const KasaIdRoute = KasaIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -226,6 +232,7 @@ export interface FileRoutesByFullPath {
   '/urunler': typeof UrunlerRoute
   '/bankalar/$id': typeof BankalarIdRoute
   '/kasa/$id': typeof KasaIdRoute
+  '/pazaryerleri/$id': typeof PazaryerleriIdRoute
   '/pazaryerleri/amazon': typeof PazaryerleriAmazonRoute
   '/pazaryerleri/ayarlar': typeof PazaryerleriAyarlarRoute
   '/pazaryerleri/ciceksepeti': typeof PazaryerleriCiceksepetiRoute
@@ -260,6 +267,7 @@ export interface FileRoutesByTo {
   '/urunler': typeof UrunlerRoute
   '/bankalar/$id': typeof BankalarIdRoute
   '/kasa/$id': typeof KasaIdRoute
+  '/pazaryerleri/$id': typeof PazaryerleriIdRoute
   '/pazaryerleri/amazon': typeof PazaryerleriAmazonRoute
   '/pazaryerleri/ayarlar': typeof PazaryerleriAyarlarRoute
   '/pazaryerleri/ciceksepeti': typeof PazaryerleriCiceksepetiRoute
@@ -295,6 +303,7 @@ export interface FileRoutesById {
   '/urunler': typeof UrunlerRoute
   '/bankalar_/$id': typeof BankalarIdRoute
   '/kasa/$id': typeof KasaIdRoute
+  '/pazaryerleri/$id': typeof PazaryerleriIdRoute
   '/pazaryerleri/amazon': typeof PazaryerleriAmazonRoute
   '/pazaryerleri/ayarlar': typeof PazaryerleriAyarlarRoute
   '/pazaryerleri/ciceksepeti': typeof PazaryerleriCiceksepetiRoute
@@ -331,6 +340,7 @@ export interface FileRouteTypes {
     | '/urunler'
     | '/bankalar/$id'
     | '/kasa/$id'
+    | '/pazaryerleri/$id'
     | '/pazaryerleri/amazon'
     | '/pazaryerleri/ayarlar'
     | '/pazaryerleri/ciceksepeti'
@@ -365,6 +375,7 @@ export interface FileRouteTypes {
     | '/urunler'
     | '/bankalar/$id'
     | '/kasa/$id'
+    | '/pazaryerleri/$id'
     | '/pazaryerleri/amazon'
     | '/pazaryerleri/ayarlar'
     | '/pazaryerleri/ciceksepeti'
@@ -399,6 +410,7 @@ export interface FileRouteTypes {
     | '/urunler'
     | '/bankalar_/$id'
     | '/kasa/$id'
+    | '/pazaryerleri/$id'
     | '/pazaryerleri/amazon'
     | '/pazaryerleri/ayarlar'
     | '/pazaryerleri/ciceksepeti'
@@ -433,6 +445,7 @@ export interface RootRouteChildren {
   TakvimRoute: typeof TakvimRoute
   UrunlerRoute: typeof UrunlerRoute
   BankalarIdRoute: typeof BankalarIdRoute
+  PazaryerleriIdRoute: typeof PazaryerleriIdRoute
   PazaryerleriAmazonRoute: typeof PazaryerleriAmazonRoute
   PazaryerleriAyarlarRoute: typeof PazaryerleriAyarlarRoute
   PazaryerleriCiceksepetiRoute: typeof PazaryerleriCiceksepetiRoute
@@ -652,6 +665,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PazaryerleriAmazonRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pazaryerleri/$id': {
+      id: '/pazaryerleri/$id'
+      path: '/pazaryerleri/$id'
+      fullPath: '/pazaryerleri/$id'
+      preLoaderRoute: typeof PazaryerleriIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/kasa/$id': {
       id: '/kasa/$id'
       path: '/$id'
@@ -706,6 +726,7 @@ const rootRouteChildren: RootRouteChildren = {
   TakvimRoute: TakvimRoute,
   UrunlerRoute: UrunlerRoute,
   BankalarIdRoute: BankalarIdRoute,
+  PazaryerleriIdRoute: PazaryerleriIdRoute,
   PazaryerleriAmazonRoute: PazaryerleriAmazonRoute,
   PazaryerleriAyarlarRoute: PazaryerleriAyarlarRoute,
   PazaryerleriCiceksepetiRoute: PazaryerleriCiceksepetiRoute,
