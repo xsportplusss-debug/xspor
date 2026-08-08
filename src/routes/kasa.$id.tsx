@@ -9,11 +9,12 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Minus, Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { fmt } from "@/lib/mock-data";
 import { useStore, cashBalance } from "@/lib/store";
+import { flushSync } from "@/lib/cloud-sync";
 
 export const Route = createFileRoute("/kasa/$id")({
   head: () => ({ meta: [{ title: "Kasa Hareketleri — Fintra" }] }),
