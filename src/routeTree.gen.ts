@@ -27,6 +27,7 @@ import { Route as BildirimlerRouteImport } from './routes/bildirimler'
 import { Route as BankalarRouteImport } from './routes/bankalar'
 import { Route as AlisFaturalariRouteImport } from './routes/alis-faturalari'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PazaryerleriIndexRouteImport } from './routes/pazaryerleri.index'
 import { Route as PazaryerleriTurkcellPasajRouteImport } from './routes/pazaryerleri.turkcell-pasaj'
 import { Route as PazaryerleriTrendyolRouteImport } from './routes/pazaryerleri.trendyol'
 import { Route as PazaryerleriPttavmRouteImport } from './routes/pazaryerleri.pttavm'
@@ -37,6 +38,7 @@ import { Route as PazaryerleriHepsiburadaRouteImport } from './routes/pazaryerle
 import { Route as PazaryerleriCiceksepetiRouteImport } from './routes/pazaryerleri.ciceksepeti'
 import { Route as PazaryerleriAyarlarRouteImport } from './routes/pazaryerleri.ayarlar'
 import { Route as PazaryerleriAmazonRouteImport } from './routes/pazaryerleri.amazon'
+import { Route as PazaryerleriIdRouteImport } from './routes/pazaryerleri.$id'
 import { Route as KasaIdRouteImport } from './routes/kasa.$id'
 import { Route as BankalarIdRouteImport } from './routes/bankalar_.$id'
 import { Route as ApiPublicHooksDriveBackupRouteImport } from './routes/api/public/hooks/drive-backup'
@@ -131,6 +133,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PazaryerleriIndexRoute = PazaryerleriIndexRouteImport.update({
+  id: '/pazaryerleri/',
+  path: '/pazaryerleri/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PazaryerleriTurkcellPasajRoute =
   PazaryerleriTurkcellPasajRouteImport.update({
     id: '/pazaryerleri/turkcell-pasaj',
@@ -182,6 +189,11 @@ const PazaryerleriAmazonRoute = PazaryerleriAmazonRouteImport.update({
   path: '/pazaryerleri/amazon',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PazaryerleriIdRoute = PazaryerleriIdRouteImport.update({
+  id: '/pazaryerleri/$id',
+  path: '/pazaryerleri/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const KasaIdRoute = KasaIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -220,6 +232,7 @@ export interface FileRoutesByFullPath {
   '/urunler': typeof UrunlerRoute
   '/bankalar/$id': typeof BankalarIdRoute
   '/kasa/$id': typeof KasaIdRoute
+  '/pazaryerleri/$id': typeof PazaryerleriIdRoute
   '/pazaryerleri/amazon': typeof PazaryerleriAmazonRoute
   '/pazaryerleri/ayarlar': typeof PazaryerleriAyarlarRoute
   '/pazaryerleri/ciceksepeti': typeof PazaryerleriCiceksepetiRoute
@@ -230,6 +243,7 @@ export interface FileRoutesByFullPath {
   '/pazaryerleri/pttavm': typeof PazaryerleriPttavmRoute
   '/pazaryerleri/trendyol': typeof PazaryerleriTrendyolRoute
   '/pazaryerleri/turkcell-pasaj': typeof PazaryerleriTurkcellPasajRoute
+  '/pazaryerleri/': typeof PazaryerleriIndexRoute
   '/api/public/hooks/drive-backup': typeof ApiPublicHooksDriveBackupRoute
 }
 export interface FileRoutesByTo {
@@ -253,6 +267,7 @@ export interface FileRoutesByTo {
   '/urunler': typeof UrunlerRoute
   '/bankalar/$id': typeof BankalarIdRoute
   '/kasa/$id': typeof KasaIdRoute
+  '/pazaryerleri/$id': typeof PazaryerleriIdRoute
   '/pazaryerleri/amazon': typeof PazaryerleriAmazonRoute
   '/pazaryerleri/ayarlar': typeof PazaryerleriAyarlarRoute
   '/pazaryerleri/ciceksepeti': typeof PazaryerleriCiceksepetiRoute
@@ -263,6 +278,7 @@ export interface FileRoutesByTo {
   '/pazaryerleri/pttavm': typeof PazaryerleriPttavmRoute
   '/pazaryerleri/trendyol': typeof PazaryerleriTrendyolRoute
   '/pazaryerleri/turkcell-pasaj': typeof PazaryerleriTurkcellPasajRoute
+  '/pazaryerleri': typeof PazaryerleriIndexRoute
   '/api/public/hooks/drive-backup': typeof ApiPublicHooksDriveBackupRoute
 }
 export interface FileRoutesById {
@@ -287,6 +303,7 @@ export interface FileRoutesById {
   '/urunler': typeof UrunlerRoute
   '/bankalar_/$id': typeof BankalarIdRoute
   '/kasa/$id': typeof KasaIdRoute
+  '/pazaryerleri/$id': typeof PazaryerleriIdRoute
   '/pazaryerleri/amazon': typeof PazaryerleriAmazonRoute
   '/pazaryerleri/ayarlar': typeof PazaryerleriAyarlarRoute
   '/pazaryerleri/ciceksepeti': typeof PazaryerleriCiceksepetiRoute
@@ -297,6 +314,7 @@ export interface FileRoutesById {
   '/pazaryerleri/pttavm': typeof PazaryerleriPttavmRoute
   '/pazaryerleri/trendyol': typeof PazaryerleriTrendyolRoute
   '/pazaryerleri/turkcell-pasaj': typeof PazaryerleriTurkcellPasajRoute
+  '/pazaryerleri/': typeof PazaryerleriIndexRoute
   '/api/public/hooks/drive-backup': typeof ApiPublicHooksDriveBackupRoute
 }
 export interface FileRouteTypes {
@@ -322,6 +340,7 @@ export interface FileRouteTypes {
     | '/urunler'
     | '/bankalar/$id'
     | '/kasa/$id'
+    | '/pazaryerleri/$id'
     | '/pazaryerleri/amazon'
     | '/pazaryerleri/ayarlar'
     | '/pazaryerleri/ciceksepeti'
@@ -332,6 +351,7 @@ export interface FileRouteTypes {
     | '/pazaryerleri/pttavm'
     | '/pazaryerleri/trendyol'
     | '/pazaryerleri/turkcell-pasaj'
+    | '/pazaryerleri/'
     | '/api/public/hooks/drive-backup'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -355,6 +375,7 @@ export interface FileRouteTypes {
     | '/urunler'
     | '/bankalar/$id'
     | '/kasa/$id'
+    | '/pazaryerleri/$id'
     | '/pazaryerleri/amazon'
     | '/pazaryerleri/ayarlar'
     | '/pazaryerleri/ciceksepeti'
@@ -365,6 +386,7 @@ export interface FileRouteTypes {
     | '/pazaryerleri/pttavm'
     | '/pazaryerleri/trendyol'
     | '/pazaryerleri/turkcell-pasaj'
+    | '/pazaryerleri'
     | '/api/public/hooks/drive-backup'
   id:
     | '__root__'
@@ -388,6 +410,7 @@ export interface FileRouteTypes {
     | '/urunler'
     | '/bankalar_/$id'
     | '/kasa/$id'
+    | '/pazaryerleri/$id'
     | '/pazaryerleri/amazon'
     | '/pazaryerleri/ayarlar'
     | '/pazaryerleri/ciceksepeti'
@@ -398,6 +421,7 @@ export interface FileRouteTypes {
     | '/pazaryerleri/pttavm'
     | '/pazaryerleri/trendyol'
     | '/pazaryerleri/turkcell-pasaj'
+    | '/pazaryerleri/'
     | '/api/public/hooks/drive-backup'
   fileRoutesById: FileRoutesById
 }
@@ -421,6 +445,7 @@ export interface RootRouteChildren {
   TakvimRoute: typeof TakvimRoute
   UrunlerRoute: typeof UrunlerRoute
   BankalarIdRoute: typeof BankalarIdRoute
+  PazaryerleriIdRoute: typeof PazaryerleriIdRoute
   PazaryerleriAmazonRoute: typeof PazaryerleriAmazonRoute
   PazaryerleriAyarlarRoute: typeof PazaryerleriAyarlarRoute
   PazaryerleriCiceksepetiRoute: typeof PazaryerleriCiceksepetiRoute
@@ -431,6 +456,7 @@ export interface RootRouteChildren {
   PazaryerleriPttavmRoute: typeof PazaryerleriPttavmRoute
   PazaryerleriTrendyolRoute: typeof PazaryerleriTrendyolRoute
   PazaryerleriTurkcellPasajRoute: typeof PazaryerleriTurkcellPasajRoute
+  PazaryerleriIndexRoute: typeof PazaryerleriIndexRoute
   ApiPublicHooksDriveBackupRoute: typeof ApiPublicHooksDriveBackupRoute
 }
 
@@ -562,6 +588,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pazaryerleri/': {
+      id: '/pazaryerleri/'
+      path: '/pazaryerleri'
+      fullPath: '/pazaryerleri/'
+      preLoaderRoute: typeof PazaryerleriIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pazaryerleri/turkcell-pasaj': {
       id: '/pazaryerleri/turkcell-pasaj'
       path: '/pazaryerleri/turkcell-pasaj'
@@ -632,6 +665,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PazaryerleriAmazonRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pazaryerleri/$id': {
+      id: '/pazaryerleri/$id'
+      path: '/pazaryerleri/$id'
+      fullPath: '/pazaryerleri/$id'
+      preLoaderRoute: typeof PazaryerleriIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/kasa/$id': {
       id: '/kasa/$id'
       path: '/$id'
@@ -686,6 +726,7 @@ const rootRouteChildren: RootRouteChildren = {
   TakvimRoute: TakvimRoute,
   UrunlerRoute: UrunlerRoute,
   BankalarIdRoute: BankalarIdRoute,
+  PazaryerleriIdRoute: PazaryerleriIdRoute,
   PazaryerleriAmazonRoute: PazaryerleriAmazonRoute,
   PazaryerleriAyarlarRoute: PazaryerleriAyarlarRoute,
   PazaryerleriCiceksepetiRoute: PazaryerleriCiceksepetiRoute,
@@ -696,6 +737,7 @@ const rootRouteChildren: RootRouteChildren = {
   PazaryerleriPttavmRoute: PazaryerleriPttavmRoute,
   PazaryerleriTrendyolRoute: PazaryerleriTrendyolRoute,
   PazaryerleriTurkcellPasajRoute: PazaryerleriTurkcellPasajRoute,
+  PazaryerleriIndexRoute: PazaryerleriIndexRoute,
   ApiPublicHooksDriveBackupRoute: ApiPublicHooksDriveBackupRoute,
 }
 export const routeTree = rootRouteImport
