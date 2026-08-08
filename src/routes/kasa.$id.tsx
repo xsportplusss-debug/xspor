@@ -172,7 +172,7 @@ function Page() {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{editing ? "Hareketi Düzenle" : "Yeni Kasa Hareketi"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editing ? "Hareketi Düzenle" : form.type === "in" ? "Yeni Giriş" : "Yeni Çıkış"}</DialogTitle></DialogHeader>
           <div className="grid gap-3">
             <div className="grid grid-cols-2 gap-2">
               <div><Label>Tarih</Label><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></div>
@@ -183,7 +183,6 @@ function Page() {
                   <SelectContent>
                     <SelectItem value="in">Giriş</SelectItem>
                     <SelectItem value="out">Çıkış</SelectItem>
-                    <SelectItem value="adj">Düzeltme</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
