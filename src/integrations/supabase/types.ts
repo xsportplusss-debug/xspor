@@ -510,6 +510,242 @@ export type Database = {
         }
         Relationships: []
       }
+      edm_invoice_lines: {
+        Row: {
+          code: string | null
+          created_at: string
+          currency: string
+          discount: number
+          id: string
+          invoice_id: string
+          line_no: number
+          line_total: number
+          matched: boolean
+          name: string | null
+          quantity: number
+          unit: string | null
+          unit_price: number
+          user_id: string
+          vat_amount: number
+          vat_rate: number
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          currency?: string
+          discount?: number
+          id?: string
+          invoice_id: string
+          line_no?: number
+          line_total?: number
+          matched?: boolean
+          name?: string | null
+          quantity?: number
+          unit?: string | null
+          unit_price?: number
+          user_id: string
+          vat_amount?: number
+          vat_rate?: number
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          currency?: string
+          discount?: number
+          id?: string
+          invoice_id?: string
+          line_no?: number
+          line_total?: number
+          matched?: boolean
+          name?: string | null
+          quantity?: number
+          unit?: string | null
+          unit_price?: number
+          user_id?: string
+          vat_amount?: number
+          vat_rate?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "edm_invoice_lines_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "edm_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      edm_invoices: {
+        Row: {
+          buyer_name: string | null
+          buyer_vkn: string | null
+          created_at: string
+          currency: string
+          direction: string
+          discount_amount: number
+          edm_status: string | null
+          gib_status_code: string | null
+          gib_status_desc: string | null
+          grand_total: number
+          id: string
+          imported_at: string
+          invoice_date: string | null
+          invoice_number: string | null
+          invoice_type: string | null
+          invoice_uuid: string
+          issued_at: string | null
+          line_extension_amount: number
+          payable_amount: number
+          provider: string
+          raw: Json | null
+          scenario: string | null
+          seller_name: string | null
+          seller_vkn: string | null
+          status: string | null
+          tax_base: number
+          tax_office: string | null
+          tax_total: number
+          ubl_xml: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          buyer_name?: string | null
+          buyer_vkn?: string | null
+          created_at?: string
+          currency?: string
+          direction: string
+          discount_amount?: number
+          edm_status?: string | null
+          gib_status_code?: string | null
+          gib_status_desc?: string | null
+          grand_total?: number
+          id?: string
+          imported_at?: string
+          invoice_date?: string | null
+          invoice_number?: string | null
+          invoice_type?: string | null
+          invoice_uuid: string
+          issued_at?: string | null
+          line_extension_amount?: number
+          payable_amount?: number
+          provider?: string
+          raw?: Json | null
+          scenario?: string | null
+          seller_name?: string | null
+          seller_vkn?: string | null
+          status?: string | null
+          tax_base?: number
+          tax_office?: string | null
+          tax_total?: number
+          ubl_xml?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          buyer_name?: string | null
+          buyer_vkn?: string | null
+          created_at?: string
+          currency?: string
+          direction?: string
+          discount_amount?: number
+          edm_status?: string | null
+          gib_status_code?: string | null
+          gib_status_desc?: string | null
+          grand_total?: number
+          id?: string
+          imported_at?: string
+          invoice_date?: string | null
+          invoice_number?: string | null
+          invoice_type?: string | null
+          invoice_uuid?: string
+          issued_at?: string | null
+          line_extension_amount?: number
+          payable_amount?: number
+          provider?: string
+          raw?: Json | null
+          scenario?: string | null
+          seller_name?: string | null
+          seller_vkn?: string | null
+          status?: string | null
+          tax_base?: number
+          tax_office?: string | null
+          tax_total?: number
+          ubl_xml?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      integration_settings: {
+        Row: {
+          api_url: string
+          company_code: string | null
+          company_name: string | null
+          connection_status: string
+          created_at: string
+          encrypted_password: string | null
+          environment: string
+          gb_label: string | null
+          id: string
+          last_error: string | null
+          last_sync_at: string | null
+          pk_label: string | null
+          provider: string
+          session_expires_at: string | null
+          session_id: string | null
+          token: string | null
+          updated_at: string
+          user_id: string
+          username: string
+          vkn_tckn: string | null
+        }
+        Insert: {
+          api_url?: string
+          company_code?: string | null
+          company_name?: string | null
+          connection_status?: string
+          created_at?: string
+          encrypted_password?: string | null
+          environment?: string
+          gb_label?: string | null
+          id?: string
+          last_error?: string | null
+          last_sync_at?: string | null
+          pk_label?: string | null
+          provider?: string
+          session_expires_at?: string | null
+          session_id?: string | null
+          token?: string | null
+          updated_at?: string
+          user_id: string
+          username?: string
+          vkn_tckn?: string | null
+        }
+        Update: {
+          api_url?: string
+          company_code?: string | null
+          company_name?: string | null
+          connection_status?: string
+          created_at?: string
+          encrypted_password?: string | null
+          environment?: string
+          gb_label?: string | null
+          id?: string
+          last_error?: string | null
+          last_sync_at?: string | null
+          pk_label?: string | null
+          provider?: string
+          session_expires_at?: string | null
+          session_id?: string | null
+          token?: string | null
+          updated_at?: string
+          user_id?: string
+          username?: string
+          vkn_tckn?: string | null
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           amount: number
