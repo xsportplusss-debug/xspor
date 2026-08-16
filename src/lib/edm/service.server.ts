@@ -116,7 +116,15 @@ export async function saveSettings(userId: string, input: EdmSettingsInput) {
   return toPublic(await loadRow(userId));
 }
 
-async function setStatus(userId: string, patch: Record<string, unknown>) {
+type StatusPatch = {
+  session_id?: string | null;
+  session_expires_at?: string | null;
+  connection_status?: string;
+  last_error?: string | null;
+  last_sync_at?: string | null;
+};
+
+async function setStatus(userId: string, patch: StatusPatch) {
   await supabaseAdmin
     .from("integration_settings")
     .update(patch)
