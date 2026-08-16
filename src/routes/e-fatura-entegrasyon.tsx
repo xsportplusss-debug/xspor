@@ -63,7 +63,7 @@ function Page() {
       gb_label: s.gb_label ?? "",
       pk_label: s.pk_label ?? "",
       company_code: s.company_code ?? "",
-      token: s.token ?? "",
+      token: "",
     });
   }, [settings.data]);
 
