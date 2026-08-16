@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useStore } from "@/lib/store";
 import { InvoiceListView } from "@/components/invoice-list-view";
+import { EdmInvoicePanel } from "@/components/edm-invoice-panel";
 
 export const Route = createFileRoute("/satis-faturalari")({
   head: () => ({
@@ -15,6 +16,7 @@ export const Route = createFileRoute("/satis-faturalari")({
 function Page() {
   const list = useStore((s) => s.salesInvoices);
   return (
+    <div className="space-y-6">
     <InvoiceListView
       title="Satış Faturaları"
       partyLabel="Müşteri"
@@ -28,5 +30,7 @@ function Page() {
       remove={useStore((s) => s.removeSales)}
       bulkRemove={useStore((s) => s.bulkRemoveSales)}
     />
+    <EdmInvoicePanel direction="OUT" />
+    </div>
   );
 }
